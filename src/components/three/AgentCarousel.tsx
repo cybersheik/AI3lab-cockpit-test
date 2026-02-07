@@ -13,9 +13,10 @@ const iconComponents = {
   Waves,
 };
 
-// Agent positions in a circle (excluding coordinator which is in center)
+// Agent positions in an ellipse (excluding coordinator which is in center)
 const circleAgents = ['creator', 'red-team', 'co-creator'];
-const circleRadius = 4;
+const ellipseRadiusX = 5;   // wider horizontal spread
+const ellipseRadiusZ = 3.5; // shallower depth for perspective
 
 interface AgentCarouselProps {
   onAgentClick?: (agentId: string) => void;
@@ -36,8 +37,8 @@ export function AgentCarousel({ onAgentClick }: AgentCarouselProps) {
       return {
         agentId,
         angle,
-        x: Math.cos(angle) * circleRadius,
-        z: Math.sin(angle) * circleRadius,
+        x: Math.cos(angle) * ellipseRadiusX,
+        z: Math.sin(angle) * ellipseRadiusZ,
       };
     });
   }, []);
@@ -57,7 +58,7 @@ export function AgentCarousel({ onAgentClick }: AgentCarouselProps) {
 
   // Animation for carousel rotation
   useFrame((state, delta) => {
-    if (!carouselRef.current) return;
+    if (!carouselRef.current || !coordinatorRef.current) return;
 
     // Handle target rotation (when user clicks an agent)
     if (targetRotation !== null && carouselRef.current) {
@@ -76,8 +77,8 @@ export function AgentCarousel({ onAgentClick }: AgentCarouselProps) {
       }
     }
 
-    // Floating animation for coordinator (when visible and not banner open)
-    if (coordinatorRef.current && !bannerOpen && !reducedMotion) {
+    // Floating animation for coordinator (when visible)
+    if (!bannerOpen && !reducedMotion && coordinatorRef.current) {
       coordinatorRef.current.position.y = Math.sin(state.clock.elapsedTime * 0.8) * 0.1;
       coordinatorRef.current.rotation.y = state.clock.elapsedTime * 0.1;
     }
@@ -103,9 +104,23 @@ export function AgentCarousel({ onAgentClick }: AgentCarouselProps) {
 
   return (
     <group ref={groupRef}>
-      {/* Center Coordinator (completely hidden when banner opens) */}
-      {coordinatorAgent && !bannerOpen && (
+      {/* Center Coordinator (hidden when banner opens) */}
+      {!bannerOpen && coordinatorAgent && (
         <group ref={coordinatorRef} position={[0, 0, 0]}>
+          {/* Clickable invisible sphere for Coordinator */}
+          <mesh
+            onClick={() => onAgentClick?.('coordinator')}
+            onPointerOver={() => document.body.style.cursor = 'pointer'}
+            onPointerOut={() => document.body.style.cursor = 'auto'}
+          >
+            <sphereGeometry args={[1.5, 32, 32]} />
+            <meshBasicMaterial
+              transparent
+              opacity={0}
+              side={THREE.DoubleSide}
+            />
+          </mesh>
+
           {/* Coordinator platform */}
           <mesh position={[0, -0.3, 0]} rotation={[-Math.PI / 2, 0, 0]}>
             <circleGeometry args={[1.5, 32]} />
@@ -141,29 +156,17 @@ export function AgentCarousel({ onAgentClick }: AgentCarouselProps) {
             />
           </mesh>
 
-          {/* Clickable area for Coordinator */}
-          <mesh
-            onClick={() => onAgentClick?.('coordinator')}
-            onPointerOver={() => document.body.style.cursor = 'pointer'}
-            onPointerOut={() => document.body.style.cursor = 'auto'}
-          >
-            <sphereGeometry args={[1.6, 16, 16]} />
-            <meshBasicMaterial transparent opacity={0} />
-          </mesh>
-
-          {/* Coordinator HTML Label */}
+          {/* Coordinator HTML Label - clickable */}
           <Html
             position={[0, 2, 0]}
             center
             distanceFactor={8}
             style={{
-              pointerEvents: 'auto',
               userSelect: 'none',
-              cursor: 'pointer',
             }}
           >
             <div
-              className="glass-panel px-4 py-2 text-center cursor-pointer hover:scale-105 transition-transform"
+              className="glass-panel px-4 py-2 text-center cursor-pointer hover:bg-white/10 transition-colors"
               onClick={() => onAgentClick?.('coordinator')}
               style={{
                 borderColor: coordinatorAgent.color,

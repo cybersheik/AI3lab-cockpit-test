@@ -84,7 +84,7 @@ export const workModes: WorkMode[] = [
 export const agents: Agent[] = [
   {
     id: 'creator',
-    name: 'Claude 3',
+    name: 'Claude',
     role: 'Creator',
     color: '#4CAF50',
     glowColor: 'rgba(76, 175, 80, 0.4)',
@@ -95,7 +95,7 @@ export const agents: Agent[] = [
   },
   {
     id: 'coordinator',
-    name: 'You (AI)',
+    name: 'Qwen',
     role: 'Coordinator',
     color: '#2196F3',
     glowColor: 'rgba(33, 150, 243, 0.4)',
@@ -106,7 +106,7 @@ export const agents: Agent[] = [
   },
   {
     id: 'red-team',
-    name: 'ChatGPT-4',
+    name: 'ChatGPT',
     role: 'Red Team',
     color: '#FF5722',
     glowColor: 'rgba(255, 87, 34, 0.4)',
@@ -117,7 +117,7 @@ export const agents: Agent[] = [
   },
   {
     id: 'co-creator',
-    name: 'Gemini Pro',
+    name: 'Gemini',
     role: 'Co-Creator',
     color: '#9C27B0',
     glowColor: 'rgba(156, 39, 176, 0.4)',
