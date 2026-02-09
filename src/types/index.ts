@@ -99,6 +99,7 @@ export interface AppState {
   
   // Carousel animation
   isCarouselAnimating: boolean;
+  carouselRotation: number;
   
   // Session state
   workMode: WorkModeType;

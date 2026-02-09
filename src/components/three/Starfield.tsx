@@ -1,3 +1,4 @@
+import { getCircleTexture } from './particleTexture';
 import { useRef, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
@@ -63,7 +64,7 @@ export function Starfield({ count = 2000 }: StarfieldProps) {
 
   return (
     <points ref={meshRef} geometry={geometry}>
-      <pointsMaterial
+      <pointsMaterial map={getCircleTexture()} depthWrite={false}
         size={0.05}
         vertexColors
         transparent

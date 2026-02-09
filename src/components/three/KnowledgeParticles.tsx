@@ -1,3 +1,4 @@
+import { getCircleTexture } from './particleTexture';
 import { useRef, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
@@ -101,7 +102,7 @@ export function KnowledgeParticles({ count: propCount }: KnowledgeParticlesProps
   return (
     <group ref={groupRef}>
       <points ref={particlesRef} geometry={geometry}>
-        <pointsMaterial
+        <pointsMaterial map={getCircleTexture()}
           size={0.08}
           vertexColors
           transparent

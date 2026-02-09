@@ -1,302 +1,171 @@
-import { useRef, useMemo, useState } from 'react';
-import { useFrame } from '@react-three/fiber';
+import { useRef, useMemo, useState, useEffect } from 'react';
+import { useFrame, useThree } from '@react-three/fiber';
 import { Html } from '@react-three/drei';
 import * as THREE from 'three';
 import { useAppStore, agents } from '@/store/appStore';
 import { Sprout, Zap, Flame, Waves } from 'lucide-react';
+import { getCircleTexture } from './particleTexture';
 
-// Icons for each agent
-const iconComponents = {
-  Sprout,
-  Zap,
-  Flame,
-  Waves,
-};
-
-// Agent positions in an ellipse (excluding coordinator which is in center)
+const iconComponents = { Sprout, Zap, Flame, Waves };
 const circleAgents = ['creator', 'red-team', 'co-creator'];
-const ellipseRadiusX = 5;   // wider horizontal spread
-const ellipseRadiusZ = 3.5; // shallower depth for perspective
 
-interface AgentCarouselProps {
-  onAgentClick?: (agentId: string) => void;
+function useAutoCamera(ringRadius: number) {
+  const { camera, size } = useThree();
+  const { bannerOpen } = useAppStore();
+  useEffect(() => {
+    if (bannerOpen) return;
+    const aspect = size.width / size.height;
+    const fov = 60; const padding = 1.2;
+    const z = (ringRadius + padding) / (Math.tan(THREE.MathUtils.degToRad(fov / 2)) * aspect);
+    const zC = THREE.MathUtils.clamp(z, 7, 15);
+    (camera as THREE.PerspectiveCamera).fov = fov;
+    camera.position.set(0, 2, zC); camera.lookAt(0, 0, 0);
+    (camera as THREE.PerspectiveCamera).updateProjectionMatrix();
+  }, [camera, size.width, size.height, ringRadius, bannerOpen]);
 }
 
+interface AgentCarouselProps { onAgentClick?: (agentId: string) => void; }
+
 export function AgentCarousel({ onAgentClick }: AgentCarouselProps) {
-  const groupRef = useRef<THREE.Group>(null);
   const carouselRef = useRef<THREE.Group>(null);
   const coordinatorRef = useRef<THREE.Group>(null);
-  const { bannerOpen, isCarouselAnimating, setCarouselAnimating, reducedMotion } = useAppStore();
-  const [targetRotation, setTargetRotation] = useState<number | null>(null);
+  const agentGroupRefs = useRef<(THREE.Group | null)[]>([]);
+  const particleRefs = useRef<(THREE.Points | null)[]>([]);
+  const coordinatorParticlesRef = useRef<THREE.Points | null>(null);
+  const { bannerOpen, isCarouselAnimating, setCarouselAnimating, reducedMotion, carouselRotation } = useAppStore();
   const [selectedAgentIndex, setSelectedAgentIndex] = useState<number | null>(null);
+  const circleRadius = 4;
+  useAutoCamera(circleRadius);
 
-  // Calculate positions for circle agents
-  const circlePositions = useMemo(() => {
-    return circleAgents.map((agentId, index) => {
-      const angle = (index / circleAgents.length) * Math.PI * 2 - Math.PI / 2;
-      return {
-        agentId,
-        angle,
-        x: Math.cos(angle) * ellipseRadiusX,
-        z: Math.sin(angle) * ellipseRadiusZ,
-      };
+  const circlePositions = useMemo(() => circleAgents.map((agentId, index) => {
+    const angle = (index / circleAgents.length) * Math.PI * 2 - Math.PI / 2;
+    return { agentId, angle, x: Math.cos(angle) * circleRadius, z: Math.sin(angle) * circleRadius };
+  }), [circleRadius]);
+
+  const coordinatorAgent = agents.find(a => a.id === 'coordinator');
+
+  const particleGeometries = useMemo(() => {
+    return ['coordinator', ...circleAgents].map((agentId) => {
+      const agent = agents.find(a => a.id === agentId);
+      if (!agent) return null;
+      const count = 75;
+      const positions = new Float32Array(count * 3);
+      const colors = new Float32Array(count * 3);
+      const color = new THREE.Color(agent.color);
+      for (let i = 0; i < count; i++) {
+        const a = (i / count) * Math.PI * 2;
+        const r = 0.8 + Math.random() * 0.4;
+        const h = (Math.random() - 0.5) * 1.5;
+        positions[i*3] = Math.cos(a)*r; positions[i*3+1] = h; positions[i*3+2] = Math.sin(a)*r;
+        colors[i*3] = color.r; colors[i*3+1] = color.g; colors[i*3+2] = color.b;
+      }
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+      geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+      return geo;
     });
   }, []);
 
-  // Get coordinator agent
-  const coordinatorAgent = agents.find(a => a.id === 'coordinator');
+  const connectionGeometries = useMemo(() => circlePositions.map(({ x, z }) => {
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array([0,0,0,-x,0,-z]), 3));
+    return geo;
+  }), [circlePositions]);
 
-  // Create connection line geometry
-  const connectionGeometries = useMemo(() => {
-    return circlePositions.map(({ x, z }) => {
-      const geometry = new THREE.BufferGeometry();
-      const positions = new Float32Array([0, 0, 0, -x, 0, -z]);
-      geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-      return geometry;
-    });
-  }, [circlePositions]);
-
-  // Animation for carousel rotation
-  useFrame((state, delta) => {
-    if (!carouselRef.current || !coordinatorRef.current) return;
-
-    // Handle target rotation (when user clicks an agent)
-    if (targetRotation !== null && carouselRef.current) {
-      const currentRotation = carouselRef.current.rotation.y;
-      const diff = targetRotation - currentRotation;
-      
-      // Normalize diff to -PI to PI
-      const normalizedDiff = ((diff + Math.PI) % (Math.PI * 2)) - Math.PI;
-      
-      if (Math.abs(normalizedDiff) > 0.01) {
-        carouselRef.current.rotation.y += normalizedDiff * delta * 5;
-      } else {
-        carouselRef.current.rotation.y = targetRotation;
-        setTargetRotation(null);
-        setCarouselAnimating(false);
-      }
-    }
-
-    // Floating animation for coordinator (when visible)
-    if (!bannerOpen && !reducedMotion && coordinatorRef.current) {
-      coordinatorRef.current.position.y = Math.sin(state.clock.elapsedTime * 0.8) * 0.1;
-      coordinatorRef.current.rotation.y = state.clock.elapsedTime * 0.1;
+  useFrame((state) => {
+    if (!carouselRef.current) return;
+    const time = state.clock.elapsedTime;
+    carouselRef.current.rotation.y = carouselRotation;
+    if (coordinatorParticlesRef.current && !reducedMotion) coordinatorParticlesRef.current.rotation.y = time * 0.2;
+    if (coordinatorRef.current && !reducedMotion && !bannerOpen) coordinatorRef.current.rotation.y = time * 0.1;
+    if (!reducedMotion) {
+      circleAgents.forEach((agentId, idx) => {
+        const g = agentGroupRefs.current[idx];
+        const p = particleRefs.current[idx];
+        if (g) {
+          const pulse = Math.sin(time * 3) * 0.5 + 0.5;
+          g.scale.setScalar(1 + pulse * 0.05);
+          switch (agentId) {
+            case 'creator': g.position.y = Math.sin(time * 0.8) * 0.15; break;
+            case 'red-team': break;
+            case 'co-creator': g.position.y = Math.sin(time * 1.2) * 0.08; break;
+          }
+        }
+        if (p) p.rotation.y = time * 0.2;
+      });
     }
   });
 
-  // Handle agent click with carousel rotation
   const handleAgentClick = (agentId: string, index: number) => {
     if (isCarouselAnimating) return;
-    
     setCarouselAnimating(true);
     setSelectedAgentIndex(index);
-    
-    // Calculate rotation to bring clicked agent to front (angle 0)
-    const currentAngle = circlePositions[index].angle;
-    const rotationNeeded = -currentAngle;
-    setTargetRotation(rotationNeeded);
-    
-    // Open banner after rotation
-    setTimeout(() => {
-      onAgentClick?.(agentId);
-    }, 600);
+    setTimeout(() => { onAgentClick?.(agentId); setCarouselAnimating(false); }, 500);
   };
 
   return (
-    <group ref={groupRef}>
-      {/* Center Coordinator (hidden when banner opens) */}
+    <group>
       {!bannerOpen && coordinatorAgent && (
-        <group ref={coordinatorRef} position={[0, 0, 0]}>
-          {/* Clickable invisible sphere for Coordinator */}
-          <mesh
-            onClick={() => onAgentClick?.('coordinator')}
-            onPointerOver={() => document.body.style.cursor = 'pointer'}
-            onPointerOut={() => document.body.style.cursor = 'auto'}
-          >
-            <sphereGeometry args={[1.5, 32, 32]} />
-            <meshBasicMaterial
-              transparent
-              opacity={0}
-              side={THREE.DoubleSide}
-            />
+        <group ref={coordinatorRef} position={[0,0,0]}>
+          {particleGeometries[0] && (
+            <points ref={coordinatorParticlesRef} geometry={particleGeometries[0]}>
+              <pointsMaterial size={0.04} map={getCircleTexture()} vertexColors transparent opacity={0.9} depthWrite={false} sizeAttenuation blending={THREE.AdditiveBlending} />
+            </points>
+          )}
+          <mesh onClick={() => onAgentClick?.('coordinator')} onPointerOver={() => document.body.style.cursor='pointer'} onPointerOut={() => document.body.style.cursor='auto'}>
+            <sphereGeometry args={[1.8,16,16]} />
+            <meshBasicMaterial transparent opacity={0} />
           </mesh>
-
-          {/* Coordinator platform */}
-          <mesh position={[0, -0.3, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-            <circleGeometry args={[1.5, 32]} />
-            <meshBasicMaterial
-              color={coordinatorAgent.color}
-              transparent
-              opacity={0.8}
-              blending={THREE.AdditiveBlending}
-            />
-          </mesh>
-          
-          {/* Coordinator ring */}
-          <mesh rotation={[-Math.PI / 2, 0, 0]}>
-            <ringGeometry args={[1.3, 1.5, 32]} />
-            <meshBasicMaterial
-              color={coordinatorAgent.color}
-              transparent
-              opacity={0.6}
-              blending={THREE.AdditiveBlending}
-              side={THREE.DoubleSide}
-            />
-          </mesh>
-
-          {/* Coordinator glow */}
-          <mesh>
-            <sphereGeometry args={[1.2, 32, 32]} />
-            <meshBasicMaterial
-              color={coordinatorAgent.color}
-              transparent
-              opacity={0.15}
-              blending={THREE.AdditiveBlending}
-              side={THREE.BackSide}
-            />
-          </mesh>
-
-          {/* Coordinator HTML Label - clickable */}
-          <Html
-            position={[0, 2, 0]}
-            center
-            distanceFactor={8}
-            style={{
-              userSelect: 'none',
-            }}
-          >
-            <div
-              className="glass-panel px-4 py-2 text-center cursor-pointer hover:bg-white/10 transition-colors"
+          <Html position={[0,2.5,0]} center distanceFactor={4} occlude={false} style={{ userSelect:'none' }}>
+            <div className="glass-panel px-4 py-2 text-center cursor-pointer hover:bg-white/10 transition-colors"
               onClick={() => onAgentClick?.('coordinator')}
-              style={{
-                borderColor: coordinatorAgent.color,
-                boxShadow: `0 0 30px ${coordinatorAgent.glowColor}`,
-              }}
-            >
+              style={{ borderColor: coordinatorAgent.color, boxShadow: `0 0 30px ${coordinatorAgent.glowColor}` }}>
               <div className="flex items-center justify-center gap-2 mb-1">
                 <Zap size={18} color={coordinatorAgent.color} />
-                <span className="text-lg font-bold" style={{ color: coordinatorAgent.color }}>
-                  {coordinatorAgent.role}
-                </span>
+                <span className="text-lg font-bold" style={{ color: coordinatorAgent.color }}>{coordinatorAgent.role}</span>
               </div>
               <div className="text-white text-base font-medium">{coordinatorAgent.name}</div>
               <div className="text-white/60 text-xs mt-1">{coordinatorAgent.description}</div>
-              <div
-                className="inline-flex items-center gap-1 mt-2 px-3 py-1 rounded-full text-xs"
-                style={{
-                  backgroundColor: `${coordinatorAgent.color}30`,
-                  color: coordinatorAgent.color,
-                }}
-              >
-                <span
-                  className="w-2 h-2 rounded-full animate-pulse"
-                  style={{ backgroundColor: coordinatorAgent.color }}
-                />
+              <div className="inline-flex items-center gap-1 mt-2 px-3 py-1 rounded-full text-xs"
+                style={{ backgroundColor: `${coordinatorAgent.color}30`, color: coordinatorAgent.color }}>
+                <span className="w-2 h-2 rounded-full animate-pulse" style={{ backgroundColor: coordinatorAgent.color }} />
                 {coordinatorAgent.status}
               </div>
             </div>
           </Html>
         </group>
       )}
-
-      {/* Rotating Carousel with 3 agents */}
       <group ref={carouselRef}>
         {circlePositions.map(({ agentId, x, z }, index) => {
           const agent = agents.find(a => a.id === agentId);
           if (!agent) return null;
-
-          const IconComponent = iconComponents[agent.icon as keyof typeof iconComponents];
+          const Icon = iconComponents[agent.icon as keyof typeof iconComponents];
           const isSelected = selectedAgentIndex === index;
-
+          const pGeo = particleGeometries[index + 1];
           return (
-            <group key={agentId} position={[x, 0, z]}>
-              {/* Agent platform */}
-              <mesh position={[0, -0.3, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-                <circleGeometry args={[1.2, 32]} />
-                <meshBasicMaterial
-                  color={agent.color}
-                  transparent
-                  opacity={0.3}
-                  blending={THREE.AdditiveBlending}
-                />
-              </mesh>
-
-              {/* Inner ring */}
-              <mesh rotation={[-Math.PI / 2, 0, 0]}>
-                <ringGeometry args={[0.9, 1.0, 32]} />
-                <meshBasicMaterial
-                  color={agent.color}
-                  transparent
-                  opacity={0.5}
-                  blending={THREE.AdditiveBlending}
-                  side={THREE.DoubleSide}
-                />
-              </mesh>
-
-              {/* Selection glow */}
-              {isSelected && (
-                <mesh>
-                  <sphereGeometry args={[1.5, 32, 32]} />
-                  <meshBasicMaterial
-                    color={agent.color}
-                    transparent
-                    opacity={0.2}
-                    blending={THREE.AdditiveBlending}
-                    side={THREE.BackSide}
-                  />
+            <group key={agentId} position={[x,0,z]}>
+              <group ref={(el: any) => { agentGroupRefs.current[index] = el; }}>
+                <mesh><sphereGeometry args={[0.7,32,32]} /><meshBasicMaterial color={agent.color} transparent opacity={0.6} blending={THREE.AdditiveBlending} /></mesh>
+                <mesh><sphereGeometry args={[1.0,32,32]} /><meshBasicMaterial color={agent.color} transparent opacity={0.15} side={THREE.BackSide} blending={THREE.AdditiveBlending} /></mesh>
+                <mesh position={[0,-0.5,0]} rotation={[-Math.PI/2,0,0]}><ringGeometry args={[0.9,1.0,32]} /><meshBasicMaterial color={agent.color} transparent opacity={0.3} blending={THREE.AdditiveBlending} side={THREE.DoubleSide} /></mesh>
+                <mesh rotation={[Math.PI/3,Math.PI/4,0]}><torusGeometry args={[1.1,0.015,16,64]} /><meshBasicMaterial color={agent.color} transparent opacity={0.4} blending={THREE.AdditiveBlending} /></mesh>
+                {pGeo && (<points ref={(el: any) => { particleRefs.current[index] = el; }} geometry={pGeo}>
+                  <pointsMaterial size={0.04} map={getCircleTexture()} vertexColors transparent opacity={0.9} depthWrite={false} sizeAttenuation blending={THREE.AdditiveBlending} />
+                </points>)}
+                {isSelected && (<mesh><sphereGeometry args={[1.5,32,32]} /><meshBasicMaterial color={agent.color} transparent opacity={0.2} blending={THREE.AdditiveBlending} side={THREE.BackSide} /></mesh>)}
+                <mesh onClick={() => handleAgentClick(agentId, index)} onPointerOver={() => document.body.style.cursor='pointer'} onPointerOut={() => document.body.style.cursor='auto'}>
+                  <sphereGeometry args={[1.3,16,16]} /><meshBasicMaterial transparent opacity={0} />
                 </mesh>
-              )}
-
-              {/* Clickable area */}
-              <mesh
-                onClick={() => handleAgentClick(agentId, index)}
-                onPointerOver={() => document.body.style.cursor = 'pointer'}
-                onPointerOut={() => document.body.style.cursor = 'auto'}
-              >
-                <sphereGeometry args={[1.3, 16, 16]} />
-                <meshBasicMaterial
-                  transparent
-                  opacity={0}
-                />
-              </mesh>
-
-              {/* HTML Label */}
-              <Html
-                position={[0, 1.8, 0]}
-                center
-                distanceFactor={8}
-                style={{
-                  pointerEvents: 'none',
-                  userSelect: 'none',
-                }}
-              >
-                <div
-                  className="glass-panel px-3 py-2 text-center cursor-pointer hover:scale-105 transition-transform"
-                  onClick={() => handleAgentClick(agentId, index)}
-                  style={{
-                    borderColor: agent.color,
-                    boxShadow: isSelected ? `0 0 30px ${agent.glowColor}` : `0 0 15px ${agent.glowColor}`,
-                  }}
-                >
-                  <div className="flex items-center justify-center gap-1.5 mb-1">
-                    {IconComponent && <IconComponent size={14} color={agent.color} />}
-                    <span className="text-sm font-semibold" style={{ color: agent.color }}>
-                      {agent.role}
-                    </span>
+                <Html position={[0,1.8,0]} center distanceFactor={4} occlude={false} style={{ pointerEvents:'none', userSelect:'none' }}>
+                  <div className="glass-panel px-3 py-2 text-center" style={{ borderColor: agent.color, boxShadow: isSelected ? `0 0 30px ${agent.glowColor}` : `0 0 15px ${agent.glowColor}` }}>
+                    <div className="flex items-center justify-center gap-1.5 mb-1">
+                      {Icon && <Icon size={14} color={agent.color} />} <span className="text-sm font-semibold" style={{ color: agent.color }}>{agent.role}</span>
+                    </div>
+                    <div className="text-white text-sm font-medium">{agent.name}</div>
                   </div>
-                  <div className="text-white text-sm font-medium">{agent.name}</div>
-                </div>
-              </Html>
-
-              {/* Connection line to center */}
-              <lineSegments geometry={connectionGeometries[index]}>
-                <lineBasicMaterial
-                  color={agent.color}
-                  transparent
-                  opacity={0.2}
-                  blending={THREE.AdditiveBlending}
-                />
-              </lineSegments>
+                </Html>
+                <lineSegments geometry={connectionGeometries[index]}><lineBasicMaterial color={agent.color} transparent opacity={0.2} blending={THREE.AdditiveBlending} /></lineSegments>
+              </group>
             </group>
           );
         })}

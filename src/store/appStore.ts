@@ -24,6 +24,8 @@ interface AppStore extends AppState {
   
   // Carousel actions
   setCarouselAnimating: (animating: boolean) => void;
+  setCarouselRotation: (rotation: number) => void;
+  carouselRotation: number;
   
   // Core actions
   setMode: (mode: string) => void;
@@ -182,6 +184,7 @@ export const useAppStore = create<AppStore>()(
       
       // Carousel animation
       isCarouselAnimating: false,
+      carouselRotation: 0,
       
       // Session state
       workMode: 'open' as WorkModeType,
@@ -205,6 +208,7 @@ export const useAppStore = create<AppStore>()(
       
       // Carousel actions
       setCarouselAnimating: (animating) => set({ isCarouselAnimating: animating }),
+      setCarouselRotation: (rotation) => set({ carouselRotation: rotation }),
 
       // Core actions
       setMode: (mode) => set({ currentMode: mode }),
