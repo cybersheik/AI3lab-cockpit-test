@@ -4,12 +4,13 @@ import { EffectComposer, Bloom, Noise, Vignette } from '@react-three/postprocess
 import { Starfield } from './Starfield';
 import { IdeaCore } from './IdeaCore';
 import { AgentCarousel } from './AgentCarousel';
-import { Timeline } from './Timeline';
+// import { Timeline } from './Timeline';
 import { KnowledgeParticles } from './KnowledgeParticles';
 import { useAppStore } from '@/store/appStore';
 import { useDeviceCapabilities } from '@/hooks/useDeviceCapabilities';
 
-// Camera controller with mouse interaction
+// Camera controller — mouse parallax + banner zoom only
+// Z position in normal mode managed by useAutoCamera in AgentCarousel
 function CameraController() {
   const { camera } = useThree();
   const mouseRef = useRef({ x: 0, y: 0 });
@@ -30,14 +31,18 @@ function CameraController() {
   }, [isTouch, reducedMotion, bannerOpen]);
 
   useFrame(() => {
-    if (reducedMotion || bannerOpen) {
-      // Reset camera when banner is open
+    if (bannerOpen) {
+      // Zoom out for banner
       camera.position.x += (0 - camera.position.x) * 0.05;
       camera.position.y += (2 - camera.position.y) * 0.05;
+      camera.position.z += (14 - camera.position.z) * 0.05;
+      camera.lookAt(0, 0, 0);
       return;
     }
 
-    // Smooth camera movement based on mouse
+    if (reducedMotion || isTouch) return;
+
+    // Mouse parallax (desktop only)
     targetRef.current.x += (mouseRef.current.x * 0.3 - targetRef.current.x) * 0.05;
     targetRef.current.y += (mouseRef.current.y * 0.2 - targetRef.current.y) * 0.05;
 
@@ -139,7 +144,7 @@ function SceneContent() {
       <AgentCarousel onAgentClick={handleAgentClick} />
       
       {/* Timeline */}
-      <Timeline radius={5.5} />
+      {/* <Timeline radius={5.5} /> */}
     </>
   );
 }
@@ -174,17 +179,14 @@ interface SceneProps {
 }
 
 export function Scene({ className }: SceneProps) {
-  const { screenSize } = useDeviceCapabilities();
-  const { bannerOpen } = useAppStore();
-
-  // Adjust camera FOV based on screen size
-  const fov = screenSize === 'small' ? 75 : screenSize === 'medium' ? 65 : 60;
+  // Camera FOV — useAutoCamera in AgentCarousel will override Z
+  const fov = 60;
 
   return (
     <Canvas
       className={className}
       camera={{
-        position: [0, 2, bannerOpen ? 12 : 8],
+        position: [0, 2, 10],
         fov,
         near: 0.1,
         far: 100,
@@ -197,6 +199,7 @@ export function Scene({ className }: SceneProps) {
       dpr={[1, 2]}
       style={{
         background: 'transparent',
+        touchAction: 'none',
       }}
     >
       <SceneContent />

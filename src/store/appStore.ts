@@ -176,7 +176,7 @@ export const useAppStore = create<AppStore>()(
       // Banner state
       bannerOpen: false,
       bannerAgentId: null,
-      bannerPanel: 'metrics',
+      bannerPanel: 'chat',
       
       // Routing state
       routingMode: 'all',
@@ -198,7 +198,7 @@ export const useAppStore = create<AppStore>()(
       sessionStartTime: '2026-02-03 14:30',
 
       // Banner actions
-      openBanner: (agentId) => set({ bannerOpen: true, bannerAgentId: agentId }),
+      openBanner: (agentId) => set({ bannerOpen: true, bannerAgentId: agentId, bannerPanel: 'chat' }),
       closeBanner: () => set({ bannerOpen: false, bannerAgentId: null }),
       setBannerPanel: (panel) => set({ bannerPanel: panel }),
       
