@@ -10,6 +10,7 @@ import { useAppStore } from '@/store/appStore';
 import { useSessionTimer } from '@/hooks/useSessionTimer';
 import { cn } from '@/lib/utils';
 import './App.css';
+import { AuthGate } from '@/components/ui-custom/AuthGate';
 
 // === WINDOW-LEVEL SWIPE FOR CAROUSEL ===
 // Catches touch events on window — bypasses ALL z-index issues.
@@ -159,6 +160,7 @@ function App() {
   }, []);
 
   return (
+    <AuthGate>
     <div 
       className={cn(
         'relative w-screen h-screen overflow-hidden',
@@ -206,6 +208,7 @@ function App() {
         }}
       />
     </div>
+    </AuthGate>
   );
 }
 
