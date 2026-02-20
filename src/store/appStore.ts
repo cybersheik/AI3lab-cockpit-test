@@ -86,7 +86,7 @@ export const workModes: WorkMode[] = [
 export const agents: Agent[] = [
   {
     id: 'creator',
-    name: 'Claude',
+    name: 'Claude Sonnet',
     role: 'Creator',
     color: '#4CAF50',
     glowColor: 'rgba(76, 175, 80, 0.4)',
@@ -97,7 +97,7 @@ export const agents: Agent[] = [
   },
   {
     id: 'coordinator',
-    name: 'Qwen',
+    name: 'Claude Opus',
     role: 'Coordinator',
     color: '#2196F3',
     glowColor: 'rgba(33, 150, 243, 0.4)',
