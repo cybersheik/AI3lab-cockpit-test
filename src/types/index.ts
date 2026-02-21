@@ -123,3 +123,5 @@ export interface DeviceCapabilities {
   pixelRatio: number;
   maxParticles: number;
 }
+
+export type { HubMessage, HubAck, HubAgentStatus, HubPriority, HubAckStatus, HubAgentPresence, HubTab } from './hub';
