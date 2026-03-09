@@ -12,7 +12,7 @@
  * non-negotiables: panels serve the scene, never dominate.
  */
 
-import { useState, useRef, useCallback, useMemo, useEffect } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   CircleDot,
@@ -99,7 +99,7 @@ const ZONE_STYLES: Record<OrbitalZone, React.CSSProperties> = {
 };
 
 // Motion origin for each zone (panels emerge from their edge)
-const ZONE_MOTION: Record<OrbitalZone, { initial: object; animate: object; exit: object }> = {
+const ZONE_MOTION: Record<OrbitalZone, { initial: Record<string, string | number>; animate: Record<string, string | number>; exit: Record<string, string | number> }> = {
   'bottom-left': {
     initial: { opacity: 0, x: -40, scale: 0.9, filter: 'blur(12px)' },
     animate: { opacity: 1, x: 0, scale: 1, filter: 'blur(0px)' },
