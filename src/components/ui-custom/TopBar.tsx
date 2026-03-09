@@ -13,7 +13,6 @@ import {
   User,
   Maximize,
   Minimize,
-  Settings,
   Eye,
   EyeOff,
 } from 'lucide-react';
@@ -41,17 +40,14 @@ export function TopBar() {
     workMode,
     setWorkMode,
     reducedMotion,
-    highContrast,
     toggleReducedMotion,
-    toggleHighContrast,
     isFullscreen,
     toggleFullscreen,
   } = useAppStore();
 
-  const { formatDuration, getSessionPhase } = useSessionTimer();
+  const { formatDuration } = useSessionTimer();
   const mode = workModes.find(m => m.id === currentMode);
-  const sessionInfo = getSessionPhase(sessionDuration);
-  const ModeIcon = modeIcons[workMode];
+
 
   return (
     <motion.header
@@ -67,21 +63,27 @@ export function TopBar() {
       <div className="flex items-center justify-between px-8 py-3 max-w-[1920px] mx-auto">
 
         {/* ── Left: Logo ── */}
-        <div
-          className="select-none"
-          style={{
-            fontFamily: "'JetBrains Mono', monospace",
-            fontSize: 13,
-            fontWeight: 400,
-            letterSpacing: 8,
-            textTransform: 'uppercase' as const,
-            background: 'linear-gradient(90deg, #00E5FF, #7B2D8E)',
-            WebkitBackgroundClip: 'text',
-            WebkitTextFillColor: 'transparent',
-            filter: 'drop-shadow(0 0 10px rgba(0,229,255,0.25))',
-          }}
-        >
-          AI³ Venture Engine
+        <div className="flex items-center gap-3 select-none">
+          <img
+            src="/ai3-logo.png"
+            alt="AI³"
+            className="h-7 w-7"
+            style={{ filter: 'drop-shadow(0 0 12px rgba(0,229,255,0.4))' }}
+          />
+          <span
+            style={{
+              fontFamily: "'JetBrains Mono', monospace",
+              fontSize: 12,
+              fontWeight: 400,
+              letterSpacing: 6,
+              textTransform: 'uppercase' as const,
+              background: 'linear-gradient(90deg, #00E5FF, #7B2D8E)',
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent',
+            }}
+          >
+            AI³ Venture Engine
+          </span>
         </div>
 
         {/* ── Center: Mode + Phase + Session ── */}
