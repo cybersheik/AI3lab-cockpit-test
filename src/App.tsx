@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Scene } from '@/components/three/Scene';
 import { 
+  TopBar,
   BottomBar, 
   AgentBanner,
   LoadingScreen,
@@ -180,7 +181,7 @@ function App() {
       {/* UI Overlay */}
       {!isLoading && (
         <>
-          {/* TopBar removed — Kimi brand nav will replace */}
+          <TopBar />
           <BottomBar />
           {bannerOpen && bannerAgentId && (
             <AgentBanner 

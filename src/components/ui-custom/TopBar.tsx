@@ -1,258 +1,195 @@
+/**
+ * AI³Lab TopBar — Kimi-style minimal navigation
+ *
+ * Single thin row: logo left, mode/status center, controls right.
+ * JetBrains Mono typography, cyan→purple gradient logo, pulsing status dot.
+ * Inspired by Kimi's ai3-navigator-v0.8 header pattern.
+ */
+
 import { motion } from 'framer-motion';
-import { 
-  Clock, 
-  Play, 
-  Pause, 
-  Settings, 
-  Eye, 
-  EyeOff,
-  Monitor,
+import {
   Globe,
   Lock,
   User,
-  FlaskConical,
   Maximize,
-  Minimize
+  Minimize,
+  Settings,
+  Eye,
+  EyeOff,
 } from 'lucide-react';
 import { useAppStore, workModes } from '@/store/appStore';
 import type { WorkModeType } from '@/types';
 import { useSessionTimer } from '@/hooks/useSessionTimer';
-import { Button } from '@/components/ui/button';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
 
-const workModeConfig: Record<WorkModeType, { icon: typeof Globe; label: string; color: string; borderColor: string }> = {
-  open: { icon: Globe, label: 'Open Discussion', color: '#2196F3', borderColor: 'border-blue-500' },
-  closed: { icon: Lock, label: 'Closed Loop', color: '#9C27B0', borderColor: 'border-purple-500' },
-  review: { icon: User, label: 'Human Review', color: '#FF5722', borderColor: 'border-orange-500' },
+const modeIcons: Record<WorkModeType, typeof Globe> = {
+  open: Globe,
+  closed: Lock,
+  review: User,
+};
+
+const modeLabels: Record<WorkModeType, string> = {
+  open: 'OPEN',
+  closed: 'CLOSED',
+  review: 'REVIEW',
 };
 
 export function TopBar() {
-  const { 
-    currentMode, 
-    sessionDuration, 
-    isPlaying, 
-    togglePlay,
+  const {
+    currentMode,
+    sessionDuration,
+    workMode,
+    setWorkMode,
     reducedMotion,
     highContrast,
     toggleReducedMotion,
     toggleHighContrast,
-    workMode,
-    setWorkMode,
-    sessionTitle,
-    sessionStartTime,
     isFullscreen,
     toggleFullscreen,
   } = useAppStore();
-  
-  const { formatDuration, getSessionPhase } = useSessionTimer();
 
+  const { formatDuration, getSessionPhase } = useSessionTimer();
   const mode = workModes.find(m => m.id === currentMode);
   const sessionInfo = getSessionPhase(sessionDuration);
+  const ModeIcon = modeIcons[workMode];
 
   return (
     <motion.header
-      initial={{ opacity: 0, y: -20 }}
+      initial={{ opacity: 0, y: -10 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5, delay: 0.5 }}
-      className="fixed top-0 left-0 right-0 z-50 px-4 py-2"
+      transition={{ duration: 0.6, delay: 0.4 }}
+      className="fixed top-0 left-0 right-0 z-50"
+      style={{
+        background: 'linear-gradient(180deg, rgba(13,15,26,0.85) 0%, rgba(13,15,26,0.4) 70%, transparent 100%)',
+        borderBottom: '1px solid rgba(0,217,255,0.06)',
+      }}
     >
-      <div className="glass-panel-strong mx-auto max-w-[1920px]">
-        {/* Row 1: Branding + Session Title */}
-        <div className="flex items-center justify-between px-4 py-2 border-b border-white/10">
-          {/* Left: Branding */}
-          <div className="flex items-center gap-4">
-            {/* AI³ Venture Engine Logo */}
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#6C56FF] to-[#9C27B0] flex items-center justify-center">
-                <span className="text-white font-bold text-sm">AI³</span>
-              </div>
-              <div className="hidden sm:block">
-                <div className="text-white font-semibold text-sm">AI³ Venture Engine</div>
-                <div className="text-white/50 text-[10px]">Where Ideas Multiply</div>
-              </div>
-            </div>
-            
-            {/* Divider */}
-            <div className="w-px h-6 bg-white/20" />
-            
-            {/* AI³Lab Badge */}
-            <div className="flex items-center gap-2">
-              <FlaskConical size={16} className="text-[#FF9800]" />
-              <div className="hidden sm:block">
-                <div className="text-white font-medium text-sm">AI³Lab</div>
-                <div className="text-white/50 text-[10px]">Strategic Innovation Lab</div>
-              </div>
-            </div>
-          </div>
+      <div className="flex items-center justify-between px-8 py-3 max-w-[1920px] mx-auto">
 
-          {/* Center: Session Title */}
-          <div className="flex-1 text-center px-4">
-            <div className="text-white/50 text-[10px] uppercase tracking-wider">Current Session</div>
-            <div className="text-white font-medium text-sm truncate max-w-md mx-auto">
-              {sessionTitle}
-            </div>
-          </div>
-
-          {/* Right: Session Info + Fullscreen */}
-          <div className="flex items-center gap-4">
-            <div className="text-right hidden md:block">
-              <div className="text-white/50 text-[10px] uppercase tracking-wider">Started</div>
-              <div className="text-white text-sm">{sessionStartTime}</div>
-            </div>
-            {/* Iteration counter moved to settings menu */}
-            
-            {/* Fullscreen Button */}
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={toggleFullscreen}
-              className="w-8 h-8 rounded-full hover:bg-white/10 ml-2"
-              title={isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'}
-            >
-              {isFullscreen ? (
-                <Minimize size={16} className="text-white/70" />
-              ) : (
-                <Maximize size={16} className="text-white/70" />
-              )}
-            </Button>
-          </div>
+        {/* ── Left: Logo ── */}
+        <div
+          className="select-none"
+          style={{
+            fontFamily: "'JetBrains Mono', monospace",
+            fontSize: 13,
+            fontWeight: 400,
+            letterSpacing: 8,
+            textTransform: 'uppercase' as const,
+            background: 'linear-gradient(90deg, #00E5FF, #7B2D8E)',
+            WebkitBackgroundClip: 'text',
+            WebkitTextFillColor: 'transparent',
+            filter: 'drop-shadow(0 0 10px rgba(0,229,255,0.25))',
+          }}
+        >
+          AI³ Venture Engine
         </div>
 
-        {/* Row 2: Controls + Mode Switcher */}
-        <div className="flex items-center justify-between px-4 py-2">
-          {/* Left: Work Mode Switcher */}
-          <div className="flex items-center gap-1">
-            <span className="text-white/50 text-xs mr-2 hidden sm:inline">Mode:</span>
-            {(Object.keys(workModeConfig) as WorkModeType[]).map((modeKey) => {
-              const config = workModeConfig[modeKey];
-              const Icon = config.icon;
-              const isActive = workMode === modeKey;
+        {/* ── Center: Mode + Phase + Session ── */}
+        <div className="flex items-center gap-6">
+          {/* Mode switcher */}
+          <div className="flex items-center gap-1.5">
+            {(['open', 'closed', 'review'] as WorkModeType[]).map((m) => {
+              const Icon = modeIcons[m];
+              const isActive = workMode === m;
               return (
                 <button
-                  key={modeKey}
-                  onClick={() => setWorkMode(modeKey)}
+                  key={m}
+                  onClick={() => setWorkMode(m)}
                   className={cn(
-                    "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-300",
+                    "flex items-center gap-1.5 px-2.5 py-1 rounded transition-all",
                     isActive
-                      ? `bg-white/15 text-white border border-white/20`
-                      : "text-white/50 hover:text-white/80 hover:bg-white/5"
+                      ? "bg-white/[0.08]"
+                      : "bg-transparent hover:bg-white/[0.04]"
                   )}
-                  style={isActive ? { borderColor: config.color } : {}}
+                  style={{
+                    fontFamily: "'JetBrains Mono', monospace",
+                    fontSize: 9,
+                    letterSpacing: 3,
+                    color: isActive ? '#00E5FF' : 'rgba(122,128,153,0.8)',
+                  }}
                 >
-                  <Icon size={14} style={{ color: isActive ? config.color : undefined }} />
-                  <span className="hidden sm:inline">{config.label}</span>
+                  <Icon size={11} />
+                  {modeLabels[m]}
                 </button>
               );
             })}
           </div>
 
-          {/* Center: Phase Status */}
-          <div className="hidden lg:flex items-center gap-4">
-            <div className="text-center">
-              <div className="text-white/50 text-[10px] uppercase tracking-wider">Phase</div>
-              <div className="text-white text-xs">{mode?.name}</div>
-            </div>
-            <div className="text-center">
-              <div className="text-white/50 text-[10px] uppercase tracking-wider">Session</div>
-              <div className="flex items-center gap-1">
-                <Clock size={12} className="text-[#6C56FF]" />
-                <span className="text-white text-xs">{formatDuration(sessionDuration)}</span>
-              </div>
-            </div>
-            <div className="text-center">
-              <div className="text-white/50 text-[10px] uppercase tracking-wider">Status</div>
-              <span className="text-[#6C56FF] text-xs">{sessionInfo.phase}</span>
-            </div>
+          {/* Divider */}
+          <div className="w-px h-4 bg-white/[0.08]" />
+
+          {/* Phase */}
+          <div
+            style={{
+              fontFamily: "'JetBrains Mono', monospace",
+              fontSize: 9,
+              letterSpacing: 2,
+              color: 'rgba(122,128,153,0.8)',
+            }}
+          >
+            <span style={{ color: 'rgba(122,128,153,0.5)' }}>PHASE </span>
+            <span style={{ color: '#e8eaf0' }}>{mode?.name || 'Exploration'}</span>
           </div>
 
-          {/* Right: Controls */}
-          <div className="flex items-center gap-1">
-            {/* Play/Pause */}
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={togglePlay}
-              className="w-8 h-8 rounded-full hover:bg-white/10"
-            >
-              {isPlaying ? (
-                <Pause size={16} className="text-white" />
-              ) : (
-                <Play size={16} className="text-white" />
-              )}
-            </Button>
+          {/* Divider */}
+          <div className="w-px h-4 bg-white/[0.08]" />
 
-            {/* Settings */}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="w-8 h-8 rounded-full hover:bg-white/10"
-                >
-                  <Settings size={16} className="text-white" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent 
-                align="end" 
-                className="w-56 glass-panel-strong border-white/10"
-              >
-                <DropdownMenuLabel className="text-white/70">
-                  Display Settings
-                </DropdownMenuLabel>
-                <DropdownMenuSeparator className="bg-white/10" />
-                
-                <DropdownMenuItem
-                  onClick={toggleReducedMotion}
-                  className="text-white hover:bg-white/10 cursor-pointer"
-                >
-                  {reducedMotion ? <EyeOff size={14} className="mr-2" /> : <Eye size={14} className="mr-2" />}
-                  {reducedMotion ? 'Enable Animations' : 'Reduced Motion'}
-                </DropdownMenuItem>
-
-                <DropdownMenuItem
-                  onClick={toggleHighContrast}
-                  className="text-white hover:bg-white/10 cursor-pointer"
-                >
-                  <Monitor size={14} className="mr-2" />
-                  {highContrast ? 'Normal Contrast' : 'High Contrast'}
-                </DropdownMenuItem>
-
-                <DropdownMenuItem
-                  onClick={toggleFullscreen}
-                  className="text-white hover:bg-white/10 cursor-pointer"
-                >
-                  {isFullscreen ? <Minimize size={14} className="mr-2" /> : <Maximize size={14} className="mr-2" />}
-                  {isFullscreen ? 'Exit Fullscreen' : 'Fullscreen Mode'}
-                </DropdownMenuItem>
-
-                <DropdownMenuSeparator className="bg-white/10" />
-                
-                <DropdownMenuLabel className="text-white/70">
-                  Session Info
-                </DropdownMenuLabel>
-                <div className="px-2 py-2 text-xs text-white/60">
-                  <div className="flex justify-between mb-1">
-                    <span>Phase:</span>
-                    <span className="text-[#6C56FF]">{sessionInfo.phase}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Adaptation:</span>
-                    <span className="text-[#6C56FF]">{sessionInfo.colorAdaptation}</span>
-                  </div>
-                </div>
-              </DropdownMenuContent>
-            </DropdownMenu>
+          {/* Session timer */}
+          <div className="flex items-center gap-2"
+            style={{
+              fontFamily: "'JetBrains Mono', monospace",
+              fontSize: 9,
+              letterSpacing: 2,
+              color: 'rgba(122,128,153,0.8)',
+            }}
+          >
+            <span style={{ color: 'rgba(122,128,153,0.5)' }}>SESSION </span>
+            <span style={{ color: '#e8eaf0' }}>{formatDuration(sessionDuration)}</span>
           </div>
+
+          {/* Status dot */}
+          <div
+            className="w-1.5 h-1.5 rounded-full"
+            style={{
+              background: '#00E5FF',
+              boxShadow: '0 0 8px #00E5FF, 0 0 16px rgba(0,229,255,0.3)',
+              animation: 'pulse-dot 2s ease-in-out infinite',
+            }}
+          />
+        </div>
+
+        {/* ── Right: Controls ── */}
+        <div className="flex items-center gap-2">
+          <button
+            onClick={toggleReducedMotion}
+            className="p-1.5 rounded hover:bg-white/[0.06] transition-colors"
+            title={reducedMotion ? 'Enable Motion' : 'Reduce Motion'}
+          >
+            {reducedMotion
+              ? <EyeOff size={13} className="text-white/30" />
+              : <Eye size={13} className="text-white/30" />
+            }
+          </button>
+          <button
+            onClick={toggleFullscreen}
+            className="p-1.5 rounded hover:bg-white/[0.06] transition-colors"
+            title={isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}
+          >
+            {isFullscreen
+              ? <Minimize size={13} className="text-white/30" />
+              : <Maximize size={13} className="text-white/30" />
+            }
+          </button>
         </div>
       </div>
+
+      {/* Pulse dot keyframe */}
+      <style>{`
+        @keyframes pulse-dot {
+          0%, 100% { opacity: 1; transform: scale(1); }
+          50% { opacity: 0.6; transform: scale(0.8); }
+        }
+      `}</style>
     </motion.header>
   );
 }
