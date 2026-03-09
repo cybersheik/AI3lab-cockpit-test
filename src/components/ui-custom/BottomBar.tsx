@@ -1,12 +1,15 @@
 /**
- * AI³Lab BottomBar — Emergent Crystallization
+ * AI³Lab BottomBar — Orbital Segments
  *
- * Philosophy: Panels don't "appear" — they crystallize from a latent particle field.
- * The dock area contains ambient drifting particles (latent matter).
- * User gesture triggers crystallization: particles converge, noise dissolves, form emerges.
- * On close, the panel dissolves back into the field. Energy is never lost — only redistributed.
+ * Philosophy: Panels are not stacked rectangles — they are peripheral floating segments
+ * orbiting the scene. Each panel occupies its own spatial zone: left, right, top-right,
+ * bottom-left, or a narrow bottom strip. The 3D carousel and Möbius ring are NEVER obscured.
  *
- * Inspired by Kimi's Materialize variant, reimagined through algorithmic art philosophy.
+ * The dock is a miniature centered capsule (icons only, with glow).
+ * Panels drift, breathe, and pulse — they are part of the scene, not UI overlays.
+ *
+ * Inspired by Kimi's micro-HUD (04), brand-integrated glass (02), and the Design Spine
+ * non-negotiables: panels serve the scene, never dominate.
  */
 
 import { useState, useRef, useCallback, useMemo, useEffect } from 'react';
@@ -41,6 +44,89 @@ interface PanelConfig {
   glowColor: string;
 }
 
+// ─── ORBITAL POSITION MAP ─────────────────────────────
+// Each panel has a unique peripheral zone so nothing overlaps the center scene.
+type OrbitalZone = 'bottom-left' | 'right' | 'left' | 'bottom-strip' | 'top-right';
+
+const ORBITAL_ZONES: Record<Exclude<PanelId, null>, OrbitalZone> = {
+  carousel: 'bottom-left',
+  comms: 'right',
+  terminal: 'left',
+  input: 'bottom-strip',
+  notebook: 'top-right',
+};
+
+// CSS position + size for each zone
+const ZONE_STYLES: Record<OrbitalZone, React.CSSProperties> = {
+  'bottom-left': {
+    position: 'fixed',
+    bottom: '72px',
+    left: '12px',
+    width: '280px',
+    maxHeight: '220px',
+  },
+  right: {
+    position: 'fixed',
+    top: '50%',
+    right: '12px',
+    width: '200px',
+    maxHeight: '320px',
+    transform: 'translateY(-50%)',
+  },
+  left: {
+    position: 'fixed',
+    top: '50%',
+    left: '12px',
+    width: '200px',
+    maxHeight: '320px',
+    transform: 'translateY(-50%)',
+  },
+  'bottom-strip': {
+    position: 'fixed',
+    bottom: '72px',
+    left: '50%',
+    transform: 'translateX(-50%)',
+    width: 'min(460px, calc(100vw - 24px))',
+    maxHeight: '110px',
+  },
+  'top-right': {
+    position: 'fixed',
+    top: '80px',
+    right: '12px',
+    width: '240px',
+    maxHeight: '260px',
+  },
+};
+
+// Motion origin for each zone (panels emerge from their edge)
+const ZONE_MOTION: Record<OrbitalZone, { initial: object; animate: object; exit: object }> = {
+  'bottom-left': {
+    initial: { opacity: 0, x: -40, scale: 0.9, filter: 'blur(12px)' },
+    animate: { opacity: 1, x: 0, scale: 1, filter: 'blur(0px)' },
+    exit: { opacity: 0, x: -30, scale: 0.95, filter: 'blur(8px)' },
+  },
+  right: {
+    initial: { opacity: 0, x: 40, scale: 0.9, filter: 'blur(12px)' },
+    animate: { opacity: 1, x: 0, scale: 1, filter: 'blur(0px)' },
+    exit: { opacity: 0, x: 30, scale: 0.95, filter: 'blur(8px)' },
+  },
+  left: {
+    initial: { opacity: 0, x: -40, scale: 0.9, filter: 'blur(12px)' },
+    animate: { opacity: 1, x: 0, scale: 1, filter: 'blur(0px)' },
+    exit: { opacity: 0, x: -30, scale: 0.95, filter: 'blur(8px)' },
+  },
+  'bottom-strip': {
+    initial: { opacity: 0, y: 30, scale: 0.95, filter: 'blur(10px)' },
+    animate: { opacity: 1, y: 0, scale: 1, filter: 'blur(0px)' },
+    exit: { opacity: 0, y: 20, scale: 0.97, filter: 'blur(6px)' },
+  },
+  'top-right': {
+    initial: { opacity: 0, x: 30, y: -20, scale: 0.9, filter: 'blur(12px)' },
+    animate: { opacity: 1, x: 0, y: 0, scale: 1, filter: 'blur(0px)' },
+    exit: { opacity: 0, x: 20, y: -10, scale: 0.95, filter: 'blur(8px)' },
+  },
+};
+
 // ─── PANEL CONFIGS ────────────────────────────────────
 const PANELS: PanelConfig[] = [
   { id: 'carousel', icon: CircleDot, label: 'Avatars', color: '#6C56FF', glowColor: 'rgba(108, 86, 255, 0.5)' },
@@ -54,148 +140,84 @@ const PANELS: PanelConfig[] = [
 const circleAgents = ['creator', 'red-team', 'co-creator'];
 const agentAngles = circleAgents.map((_, i) => (i / circleAgents.length) * Math.PI * 2 - Math.PI / 2);
 
-// ─── AMBIENT PARTICLE FIELD ───────────────────────────
-// Latent matter drifting near the dock — the "energy" that crystallizes into panels.
-function AmbientParticleField({ activePanel }: { activePanel: PanelId }) {
-  const particles = useMemo(() => {
-    return Array.from({ length: 18 }, (_, i) => ({
-      id: i,
-      x: 10 + (i / 18) * 80 + (Math.sin(i * 2.7) * 8),
-      baseY: 30 + Math.sin(i * 1.3) * 25,
-      size: 1.5 + Math.random() * 2,
-      colorIndex: i % PANELS.length,
-      driftDuration: 4 + Math.random() * 6,
-      driftDelay: Math.random() * -8,
-      driftAmplitudeX: 6 + Math.random() * 10,
-      driftAmplitudeY: 4 + Math.random() * 8,
-    }));
-  }, []);
+// ─── EDGE GLOW ────────────────────────────────────────
+// A thin glowing line on the edge closest to center — the panel's "connection" to the scene
+function EdgeGlow({ color, zone }: { color: string; zone: OrbitalZone }) {
+  const edgeClass = {
+    'bottom-left': 'absolute top-0 right-0 w-px h-full',
+    right: 'absolute top-0 left-0 w-px h-full',
+    left: 'absolute top-0 right-0 w-px h-full',
+    'bottom-strip': 'absolute top-0 left-0 right-0 h-px',
+    'top-right': 'absolute bottom-0 left-0 w-full h-px',
+  }[zone];
 
-  const isConverging = activePanel !== null;
+  const gradientDir = {
+    'bottom-left': '180deg',
+    right: '180deg',
+    left: '180deg',
+    'bottom-strip': '90deg',
+    'top-right': '90deg',
+  }[zone];
 
-  return (
-    <div className="absolute inset-0 pointer-events-none overflow-hidden">
-      {particles.map((p) => {
-        const panelColor = PANELS[p.colorIndex].color;
-        return (
-          <motion.div
-            key={p.id}
-            className="absolute rounded-full"
-            style={{
-              width: p.size,
-              height: p.size,
-              backgroundColor: panelColor,
-              left: `${p.x}%`,
-              top: `${p.baseY}%`,
-              filter: `blur(${p.size > 2.5 ? 1 : 0}px)`,
-            }}
-            animate={isConverging ? {
-              opacity: [0.25, 0],
-              y: [-20, -60],
-              scale: [1, 0],
-              transition: { duration: 0.5, delay: p.id * 0.02 },
-            } : {
-              opacity: [0.08, 0.25, 0.08],
-              x: [0, p.driftAmplitudeX, -p.driftAmplitudeX / 2, 0],
-              y: [0, -p.driftAmplitudeY, p.driftAmplitudeY / 2, 0],
-              transition: {
-                duration: p.driftDuration,
-                delay: p.driftDelay,
-                repeat: Infinity,
-                ease: 'easeInOut',
-              },
-            }}
-          />
-        );
-      })}
-    </div>
-  );
-}
-
-// ─── MATERIALIZE EFFECT ───────────────────────────────
-// Particles converge from the field to form the panel edges
-function MaterializeEffect({ color, isActive }: { color: string; isActive: boolean }) {
-  const count = 36;
-  const particles = useMemo(() => {
-    return Array.from({ length: count }, (_, i) => {
-      const angle = (i / count) * Math.PI * 2;
-      const radius = 120 + Math.random() * 80;
-      return { angle, radius, size: 1 + Math.random() * 2 };
-    });
-  }, [count]);
-
-  return (
-    <div className="absolute inset-0 overflow-hidden pointer-events-none">
-      {particles.map((p, i) => (
-        <motion.div
-          key={i}
-          className="absolute rounded-full"
-          style={{
-            width: p.size,
-            height: p.size,
-            backgroundColor: color,
-            left: `${50 + Math.cos(p.angle) * p.radius * 0.5}%`,
-            top: `${50 + Math.sin(p.angle) * p.radius * 0.5}%`,
-          }}
-          initial={{ opacity: 0, scale: 0 }}
-          animate={isActive ? {
-            opacity: [0, 0.8, 0.3, 0],
-            scale: [0, 1.5, 1, 0],
-            x: [`0%`, `${-Math.cos(p.angle) * p.radius * 0.4}%`],
-            y: [`0%`, `${-Math.sin(p.angle) * p.radius * 0.4}%`],
-          } : { opacity: 0, scale: 0 }}
-          transition={{
-            duration: 0.7,
-            delay: i * 0.012,
-            ease: [0.25, 0.46, 0.45, 0.94],
-          }}
-        />
-      ))}
-    </div>
-  );
-}
-
-// ─── NOISE OVERLAY ────────────────────────────────────
-// fractalNoise texture that dissolves as the panel crystallizes
-function NoiseOverlay({ isActive }: { isActive: boolean }) {
   return (
     <motion.div
-      className="absolute inset-0 pointer-events-none mix-blend-overlay rounded-2xl"
+      className={cn(edgeClass, 'pointer-events-none')}
       style={{
-        backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")`,
+        background: `linear-gradient(${gradientDir}, transparent, ${color}, transparent)`,
+        boxShadow: `0 0 12px ${color}80`,
       }}
-      initial={{ opacity: 0.4 }}
-      animate={{ opacity: isActive ? 0 : 0.4 }}
-      transition={{ duration: 0.5, delay: 0.15 }}
+      initial={{ opacity: 0, scaleY: 0 }}
+      animate={{ opacity: 0.7, scaleY: 1 }}
+      transition={{ delay: 0.15, duration: 0.4 }}
     />
   );
 }
 
-// ─── SHIMMER EFFECT ───────────────────────────────────
-// Single gradient wave sweeping across the panel on materialization
-function ShimmerEffect({ color }: { color: string }) {
+// ─── BREATHING GLOW ───────────────────────────────────
+// Subtle ambient pulse around the panel — alive, not static
+function BreathingGlow({ color }: { color: string }) {
   return (
     <motion.div
-      className="absolute inset-0 pointer-events-none overflow-hidden rounded-2xl"
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      transition={{ duration: 0.2 }}
-    >
-      <motion.div
-        className="absolute inset-0"
-        style={{
-          background: `linear-gradient(90deg, transparent 0%, ${color}15 50%, transparent 100%)`,
-        }}
-        initial={{ x: '-100%' }}
-        animate={{ x: '200%' }}
-        transition={{ duration: 1.2, ease: 'easeInOut' }}
-      />
-    </motion.div>
+      className="absolute inset-0 rounded-2xl pointer-events-none"
+      style={{
+        boxShadow: `0 0 30px ${color}15, inset 0 0 20px ${color}05`,
+      }}
+      animate={{
+        boxShadow: [
+          `0 0 30px ${color}15, inset 0 0 20px ${color}05`,
+          `0 0 45px ${color}25, inset 0 0 30px ${color}08`,
+          `0 0 30px ${color}15, inset 0 0 20px ${color}05`,
+        ],
+      }}
+      transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}
+    />
+  );
+}
+
+// ─── CORNER ACCENTS ───────────────────────────────────
+function CornerAccents({ color }: { color: string }) {
+  return (
+    <>
+      {[
+        'top-2 left-2 border-l border-t rounded-tl-lg',
+        'top-2 right-2 border-r border-t rounded-tr-lg',
+        'bottom-2 left-2 border-l border-b rounded-bl-lg',
+        'bottom-2 right-2 border-r border-b rounded-br-lg',
+      ].map((cls, i) => (
+        <motion.div
+          key={i}
+          className={`absolute w-3 h-3 ${cls} pointer-events-none`}
+          style={{ borderColor: `${color}50` }}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 0.5 }}
+          transition={{ delay: 0.2 + i * 0.04 }}
+        />
+      ))}
+    </>
   );
 }
 
 // ─── DOCK TRIGGER ─────────────────────────────────────
-// Hexagonal-clipped icon with glow ring, breathing active state, accent line
 function DockTrigger({
   config, isActive, onClick
 }: {
@@ -206,76 +228,48 @@ function DockTrigger({
   return (
     <motion.button
       onClick={onClick}
-      className="relative group flex flex-col items-center gap-1 p-2 rounded-xl transition-all focus:outline-none"
-      whileHover={{ scale: 1.1 }}
-      whileTap={{ scale: 0.9 }}
+      className="relative group flex items-center justify-center w-10 h-10 rounded-xl transition-all focus:outline-none"
+      whileHover={{ scale: 1.15 }}
+      whileTap={{ scale: 0.88 }}
     >
       {/* Glow ring on hover */}
       <motion.div
         className="absolute inset-0 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity"
         style={{
           background: `radial-gradient(circle, ${config.glowColor} 0%, transparent 70%)`,
-          filter: 'blur(10px)',
+          filter: 'blur(8px)',
         }}
       />
 
-      {/* Active background pulse */}
+      {/* Active state ring */}
       <AnimatePresence>
         {isActive && (
           <motion.div
             className="absolute inset-0 rounded-xl"
-            initial={{ opacity: 0, scale: 0.8 }}
+            initial={{ opacity: 0, scale: 0.7 }}
             animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.8 }}
+            exit={{ opacity: 0, scale: 0.7 }}
             style={{
-              background: `linear-gradient(135deg, ${config.color}20, ${config.color}05)`,
-              border: `1px solid ${config.color}40`,
-              boxShadow: `0 0 20px ${config.glowColor}`,
+              border: `1.5px solid ${config.color}60`,
+              boxShadow: `0 0 16px ${config.glowColor}`,
             }}
           />
         )}
       </AnimatePresence>
 
-      {/* Hexagonal icon clip */}
-      <div className="relative">
-        <motion.div
-          className="w-9 h-9 flex items-center justify-center transition-all duration-300"
-          animate={isActive ? {
-            scale: [1, 1.04, 1],
-            transition: { duration: 3, repeat: Infinity, ease: 'easeInOut' },
-          } : {}}
-          style={{
-            clipPath: 'polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%)',
-            background: isActive
-              ? `linear-gradient(135deg, ${config.color}35, ${config.color}10)`
-              : 'rgba(255,255,255,0.04)',
-          }}
-        >
-          <Icon
-            size={16}
-            color={isActive ? config.color : 'rgba(255,255,255,0.35)'}
-            style={{ filter: isActive ? `drop-shadow(0 0 6px ${config.color})` : 'none' }}
-          />
-        </motion.div>
-      </div>
+      {/* Icon */}
+      <Icon
+        size={17}
+        color={isActive ? config.color : 'rgba(255,255,255,0.35)'}
+        style={{ filter: isActive ? `drop-shadow(0 0 6px ${config.color})` : 'none' }}
+      />
 
-      {/* Label */}
-      <span
-        className={cn(
-          "text-[9px] font-medium tracking-wide transition-all duration-300",
-          isActive ? "text-white" : "text-white/30 group-hover:text-white/60"
-        )}
-        style={isActive ? { textShadow: `0 0 8px ${config.glowColor}` } : {}}
-      >
-        {config.label}
-      </span>
-
-      {/* Bottom accent line */}
+      {/* Bottom dot indicator */}
       <motion.div
-        className="absolute -bottom-0.5 h-[2px] rounded-full"
+        className="absolute -bottom-0.5 w-1 h-1 rounded-full"
         style={{ backgroundColor: config.color }}
-        initial={{ width: 0, opacity: 0 }}
-        animate={{ width: isActive ? 20 : 0, opacity: isActive ? 1 : 0 }}
+        initial={{ scale: 0, opacity: 0 }}
+        animate={{ scale: isActive ? 1 : 0, opacity: isActive ? 1 : 0 }}
         transition={{ type: 'spring', stiffness: 500, damping: 30 }}
       />
     </motion.button>
@@ -298,19 +292,19 @@ interface CarouselPanelProps {
 function CarouselPanel({ onAgentTap, onTouchStart, onTouchMove, onTouchEnd, onClose }: CarouselPanelProps) {
   return (
     <div className="h-full flex flex-col">
-      <div className="flex items-center justify-between mb-3">
-        <h3 className="text-white/80 font-medium text-sm flex items-center gap-2">
-          <CircleDot size={14} className="text-[#6C56FF]" />
-          Avatar Carousel
+      <div className="flex items-center justify-between mb-2">
+        <h3 className="text-white/70 font-medium text-[11px] flex items-center gap-1.5 tracking-wide">
+          <CircleDot size={12} className="text-[#6C56FF]" />
+          Avatars
         </h3>
-        <button onClick={onClose} className="p-1 hover:bg-white/10 rounded-lg transition-colors">
-          <X size={14} className="text-white/40" />
+        <button onClick={onClose} className="p-0.5 hover:bg-white/10 rounded-lg transition-colors">
+          <X size={12} className="text-white/30" />
         </button>
       </div>
 
       <div
-        className="flex items-center justify-center gap-5 py-3 rounded-xl flex-1"
-        style={{ touchAction: 'none', background: 'rgba(255,255,255,0.02)' }}
+        className="flex flex-wrap items-center justify-center gap-3 py-2 rounded-xl flex-1"
+        style={{ touchAction: 'none' }}
         onTouchStart={onTouchStart}
         onTouchMove={onTouchMove}
         onTouchEnd={onTouchEnd}
@@ -319,33 +313,26 @@ function CarouselPanel({ onAgentTap, onTouchStart, onTouchMove, onTouchEnd, onCl
           <motion.button
             key={agent.id}
             onClick={() => onAgentTap(agent.id)}
-            className="flex flex-col items-center gap-1.5 group"
+            className="flex flex-col items-center gap-1 group"
             initial={{ opacity: 0, scale: 0.5 }}
             animate={{ opacity: 1, scale: 1 }}
-            transition={{ delay: 0.25 + i * 0.08, type: 'spring' }}
-            whileHover={{ scale: 1.08 }}
-            whileTap={{ scale: 0.92 }}
+            transition={{ delay: 0.15 + i * 0.06, type: 'spring' }}
+            whileHover={{ scale: 1.1 }}
+            whileTap={{ scale: 0.9 }}
           >
             <div
-              className="w-11 h-11 rounded-full flex items-center justify-center transition-transform"
+              className="w-9 h-9 rounded-full flex items-center justify-center"
               style={{
                 background: `radial-gradient(circle at 35% 35%, ${agent.color}CC, ${agent.color}55)`,
-                boxShadow: `0 0 16px ${agent.glowColor}`,
-                border: `1.5px solid ${agent.color}77`,
+                boxShadow: `0 0 12px ${agent.glowColor}`,
+                border: `1px solid ${agent.color}60`,
               }}
             >
-              <span className="text-white text-xs font-bold">{agent.name.charAt(0)}</span>
+              <span className="text-white text-[10px] font-bold">{agent.name.charAt(0)}</span>
             </div>
-            <div className="text-center">
-              <div className="text-[9px] font-semibold" style={{ color: agent.color }}>{agent.role}</div>
-              <div className="text-[8px] text-white/35">{agent.name}</div>
-            </div>
+            <div className="text-[8px] font-medium" style={{ color: agent.color }}>{agent.role}</div>
           </motion.button>
         ))}
-      </div>
-
-      <div className="text-white/25 text-[10px] text-center mt-2">
-        Tap agent to focus · Swipe to rotate
       </div>
     </div>
   );
@@ -358,32 +345,32 @@ function CommPanel({ onClose }: { onClose: () => void }) {
 
   return (
     <div className="h-full flex flex-col">
-      <div className="flex items-center justify-between mb-3">
-        <h3 className="text-white/80 font-medium text-sm flex items-center gap-2">
-          <Radio size={14} className="text-[#00BCD4]" />
-          Communication Router
+      <div className="flex items-center justify-between mb-2">
+        <h3 className="text-white/70 font-medium text-[11px] flex items-center gap-1.5 tracking-wide">
+          <Radio size={12} className="text-[#00BCD4]" />
+          Comm Router
         </h3>
-        <button onClick={onClose} className="p-1 hover:bg-white/10 rounded-lg transition-colors">
-          <X size={14} className="text-white/40" />
+        <button onClick={onClose} className="p-0.5 hover:bg-white/10 rounded-lg transition-colors">
+          <X size={12} className="text-white/30" />
         </button>
       </div>
 
-      <div className="flex-1 overflow-auto space-y-1.5">
+      <div className="flex-1 overflow-auto space-y-1">
         {logs.map((log, i) => (
           <motion.div
             key={log.id}
-            className="p-2.5 rounded-lg bg-white/[0.03] hover:bg-white/[0.06] transition-colors border-l-2 border-[#00BCD4]/60"
-            initial={{ opacity: 0, x: -20 }}
+            className="p-2 rounded-lg bg-white/[0.03] border-l-[1.5px] border-[#00BCD4]/50"
+            initial={{ opacity: 0, x: 15 }}
             animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: 0.2 + i * 0.06 }}
+            transition={{ delay: 0.15 + i * 0.05 }}
           >
-            <div className="flex items-center gap-1.5 text-[10px] text-white/45 mb-0.5">
+            <div className="flex items-center gap-1 text-[9px] text-white/40 mb-0.5">
               <span>{log.from}</span>
-              <ChevronRight size={10} />
+              <ChevronRight size={8} />
               <span>{log.to}</span>
-              <span className="ml-auto font-mono">{log.timestamp}</span>
+              <span className="ml-auto font-mono text-[8px]">{log.timestamp}</span>
             </div>
-            <p className="text-white/80 text-xs">{log.message}</p>
+            <p className="text-white/70 text-[10px] leading-tight">{log.message}</p>
           </motion.div>
         ))}
       </div>
@@ -394,8 +381,8 @@ function CommPanel({ onClose }: { onClose: () => void }) {
 // ─── TERMINAL PANEL ───────────────────────────────────
 function TerminalPanel({ onClose }: { onClose: () => void }) {
   const tabs = [
-    { id: 'claude', name: 'Claude Code', color: '#4CAF50' },
-    { id: 'gpt', name: 'ChatGPT', color: '#FF5722' },
+    { id: 'claude', name: 'Claude', color: '#4CAF50' },
+    { id: 'gpt', name: 'GPT', color: '#FF5722' },
     { id: 'kimi', name: 'Kimi', color: '#6C56FF' },
     { id: 'qwen', name: 'Qwen', color: '#2196F3' },
   ];
@@ -403,49 +390,49 @@ function TerminalPanel({ onClose }: { onClose: () => void }) {
 
   return (
     <div className="h-full flex flex-col">
-      <div className="flex items-center justify-between mb-3">
-        <h3 className="text-white/80 font-medium text-sm flex items-center gap-2">
-          <Terminal size={14} className="text-[#4CAF50]" />
-          Code Terminal
+      <div className="flex items-center justify-between mb-2">
+        <h3 className="text-white/70 font-medium text-[11px] flex items-center gap-1.5 tracking-wide">
+          <Terminal size={12} className="text-[#4CAF50]" />
+          Code
         </h3>
-        <button onClick={onClose} className="p-1 hover:bg-white/10 rounded-lg transition-colors">
-          <X size={14} className="text-white/40" />
+        <button onClick={onClose} className="p-0.5 hover:bg-white/10 rounded-lg transition-colors">
+          <X size={12} className="text-white/30" />
         </button>
       </div>
 
-      <div className="flex gap-1 mb-2">
+      <div className="flex gap-0.5 mb-1.5">
         {tabs.map((tab) => (
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
             className={cn(
-              "px-2.5 py-1 rounded-lg text-[10px] font-medium transition-all",
-              activeTab === tab.id ? "text-white" : "text-white/35 hover:text-white/60"
+              "px-2 py-0.5 rounded-md text-[9px] font-medium transition-all",
+              activeTab === tab.id ? "text-white" : "text-white/30 hover:text-white/50"
             )}
-            style={activeTab === tab.id ? { backgroundColor: `${tab.color}25` } : {}}
+            style={activeTab === tab.id ? { backgroundColor: `${tab.color}20` } : {}}
           >
             {tab.name}
           </button>
         ))}
       </div>
 
-      <div className="flex-1 p-3 rounded-lg bg-black/40 font-mono text-[11px] overflow-auto border border-white/[0.06]">
-        <motion.p className="text-green-400/80" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.3 }}>
+      <div className="flex-1 p-2 rounded-lg bg-black/40 font-mono text-[10px] overflow-auto border border-white/[0.05]">
+        <motion.p className="text-green-400/80" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.2 }}>
           $ analyzing business_model.py
         </motion.p>
-        <motion.p className="text-white/50 mt-1.5" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.45 }}>
+        <motion.p className="text-white/50 mt-1" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.35 }}>
           Loading hypothesis validation...
         </motion.p>
-        <motion.p className="text-blue-400/80 mt-1" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.6 }}>
+        <motion.p className="text-blue-400/80 mt-0.5" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.5 }}>
           → LTV:CAC ratio: 8.3 ✓
         </motion.p>
-        <motion.p className="text-blue-400/80" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.7 }}>
+        <motion.p className="text-blue-400/80" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.6 }}>
           → Churn rate: 12% ✓
         </motion.p>
-        <motion.p className="text-yellow-400/80 mt-1.5" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.85 }}>
-          ⚠ Warning: Enterprise segment underexplored
+        <motion.p className="text-yellow-400/80 mt-1" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.75 }}>
+          ⚠ Enterprise segment underexplored
         </motion.p>
-        <motion.p className="text-white/30 mt-2 animate-pulse" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 1 }}>
+        <motion.p className="text-white/25 mt-1.5 animate-pulse" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.9 }}>
           _
         </motion.p>
       </div>
@@ -459,51 +446,47 @@ function InputPanel({ onClose }: { onClose: () => void }) {
   const [isRecording, setIsRecording] = useState(false);
 
   return (
-    <div className="h-full flex flex-col">
-      <div className="flex items-center justify-between mb-3">
-        <h3 className="text-white/80 font-medium text-sm flex items-center gap-2">
-          <Keyboard size={14} className="text-white/70" />
-          Human Input
-        </h3>
-        <button onClick={onClose} className="p-1 hover:bg-white/10 rounded-lg transition-colors">
-          <X size={14} className="text-white/40" />
-        </button>
+    <div className="h-full flex items-center gap-2 px-1">
+      <div className="flex items-center gap-1.5 shrink-0">
+        <Keyboard size={12} className="text-white/40" />
+        <span className="text-white/50 text-[10px] font-medium">Input</span>
       </div>
 
-      <div className="flex-1 flex flex-col gap-2">
-        <textarea
-          value={humanInput}
-          onChange={(e) => setHumanInput(e.target.value)}
-          placeholder="Type your command, question, or direction..."
-          className="flex-1 p-3 rounded-xl bg-white/[0.03] border border-white/[0.08] text-white text-xs placeholder:text-white/20 resize-none focus:outline-none focus:border-white/20 transition-colors"
-        />
+      <input
+        type="text"
+        value={humanInput}
+        onChange={(e) => setHumanInput(e.target.value)}
+        onKeyDown={(e) => { if (e.key === 'Enter' && humanInput.trim()) sendHumanInput(); }}
+        placeholder="Command, question, direction..."
+        className="flex-1 h-8 px-3 rounded-xl bg-white/[0.04] border border-white/[0.08] text-white text-[11px] placeholder:text-white/20 focus:outline-none focus:border-white/20 transition-colors"
+      />
 
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setIsRecording(!isRecording)}
-            className={cn(
-              "w-10 h-10 rounded-xl flex items-center justify-center transition-all",
-              isRecording ? "bg-red-500/25 animate-pulse" : "bg-white/[0.06] hover:bg-white/10"
-            )}
-          >
-            <Mic size={16} className={isRecording ? "text-red-400" : "text-white/50"} />
-          </button>
+      <button
+        onClick={() => setIsRecording(!isRecording)}
+        className={cn(
+          "w-8 h-8 rounded-xl flex items-center justify-center transition-all shrink-0",
+          isRecording ? "bg-red-500/25 animate-pulse" : "bg-white/[0.06] hover:bg-white/10"
+        )}
+      >
+        <Mic size={13} className={isRecording ? "text-red-400" : "text-white/40"} />
+      </button>
 
-          <button
-            onClick={sendHumanInput}
-            disabled={!humanInput.trim()}
-            className={cn(
-              "flex-1 h-10 rounded-xl flex items-center justify-center gap-2 text-xs font-medium transition-all",
-              humanInput.trim()
-                ? "bg-white/[0.12] hover:bg-white/[0.18] text-white"
-                : "bg-white/[0.03] text-white/25 cursor-not-allowed"
-            )}
-          >
-            <Send size={14} />
-            Send to Coordinator
-          </button>
-        </div>
-      </div>
+      <button
+        onClick={sendHumanInput}
+        disabled={!humanInput.trim()}
+        className={cn(
+          "w-8 h-8 rounded-xl flex items-center justify-center transition-all shrink-0",
+          humanInput.trim()
+            ? "bg-white/[0.12] hover:bg-white/[0.18] text-white"
+            : "bg-white/[0.03] text-white/20 cursor-not-allowed"
+        )}
+      >
+        <Send size={13} />
+      </button>
+
+      <button onClick={onClose} className="p-0.5 hover:bg-white/10 rounded-lg transition-colors shrink-0">
+        <X size={11} className="text-white/25" />
+      </button>
     </div>
   );
 }
@@ -520,17 +503,17 @@ function NotebookPanel({ onClose }: { onClose: () => void }) {
 
   return (
     <div className="h-full flex flex-col">
-      <div className="flex items-center justify-between mb-3">
-        <h3 className="text-white/80 font-medium text-sm flex items-center gap-2">
-          <BookOpen size={14} className="text-[#FFC107]" />
+      <div className="flex items-center justify-between mb-2">
+        <h3 className="text-white/70 font-medium text-[11px] flex items-center gap-1.5 tracking-wide">
+          <BookOpen size={12} className="text-[#FFC107]" />
           System Eyes
         </h3>
-        <button onClick={onClose} className="p-1 hover:bg-white/10 rounded-lg transition-colors">
-          <X size={14} className="text-white/40" />
+        <button onClick={onClose} className="p-0.5 hover:bg-white/10 rounded-lg transition-colors">
+          <X size={12} className="text-white/30" />
         </button>
       </div>
 
-      <div className="flex gap-1.5 mb-3">
+      <div className="flex gap-1 mb-2">
         {views.map((v) => {
           const VIcon = v.icon;
           return (
@@ -538,67 +521,122 @@ function NotebookPanel({ onClose }: { onClose: () => void }) {
               key={v.id}
               onClick={() => setActiveView(v.id)}
               className={cn(
-                "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-medium transition-all",
+                "flex items-center gap-1 px-2 py-1 rounded-md text-[9px] font-medium transition-all",
                 activeView === v.id
                   ? "bg-[#FFC107]/15 text-[#FFC107]"
-                  : "bg-white/[0.03] text-white/35 hover:text-white/60"
+                  : "bg-white/[0.03] text-white/30 hover:text-white/50"
               )}
             >
-              <VIcon size={12} />
+              <VIcon size={10} />
               {v.label}
             </button>
           );
         })}
       </div>
 
-      <div className="flex-1 rounded-xl bg-white/[0.02] overflow-auto p-3">
+      <div className="flex-1 rounded-xl bg-white/[0.02] overflow-auto p-2">
         {activeView === 'camera' && (
           <div className="h-full flex items-center justify-center">
             <div className="text-center">
-              <Camera size={32} className="mx-auto text-white/15 mb-3" />
-              <p className="text-white/30 text-xs">Camera feed for AI agents</p>
+              <Camera size={24} className="mx-auto text-white/15 mb-2" />
+              <p className="text-white/25 text-[10px]">Camera feed</p>
             </div>
           </div>
         )}
 
         {activeView === 'notes' && (
-          <div className="space-y-2">
+          <div className="space-y-1.5">
             {[
-              { time: '14:35 — Iteration 7', text: 'Focus shifted to enterprise pricing model. LTV:CAC looks promising.' },
-              { time: '14:42 — Red Team Input', text: 'Identified risk: SMB segment may be underserved.' },
+              { time: '14:35 — Iter 7', text: 'Focus shifted to enterprise pricing model. LTV:CAC looks promising.' },
+              { time: '14:42 — Red Team', text: 'Identified risk: SMB segment may be underserved.' },
             ].map((note, i) => (
               <motion.div
                 key={i}
-                className="p-2.5 rounded-lg bg-white/[0.03]"
-                initial={{ opacity: 0, y: 10 }}
+                className="p-2 rounded-lg bg-white/[0.03]"
+                initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.2 + i * 0.1 }}
+                transition={{ delay: 0.15 + i * 0.08 }}
               >
-                <p className="text-white/40 text-[10px] mb-0.5">{note.time}</p>
-                <p className="text-white/75 text-xs">{note.text}</p>
+                <p className="text-white/35 text-[9px] mb-0.5">{note.time}</p>
+                <p className="text-white/70 text-[10px] leading-tight">{note.text}</p>
               </motion.div>
             ))}
           </div>
         )}
 
         {activeView === 'docs' && (
-          <div className="grid grid-cols-2 gap-1.5">
-            {['Business Model Canvas', 'Hypothesis Log', 'Run Config', 'Debrief Notes'].map((doc, i) => (
+          <div className="grid grid-cols-2 gap-1">
+            {['Business Model', 'Hypothesis Log', 'Run Config', 'Debrief'].map((doc, i) => (
               <motion.button
                 key={doc}
-                className="p-2.5 rounded-lg bg-white/[0.03] hover:bg-white/[0.06] text-left transition-colors"
+                className="p-2 rounded-lg bg-white/[0.03] hover:bg-white/[0.06] text-left transition-colors"
                 initial={{ opacity: 0, scale: 0.9 }}
                 animate={{ opacity: 1, scale: 1 }}
-                transition={{ delay: 0.2 + i * 0.06 }}
+                transition={{ delay: 0.15 + i * 0.05 }}
               >
-                <FileText size={12} className="text-white/30 mb-1.5" />
-                <p className="text-white/70 text-[10px]">{doc}</p>
+                <FileText size={10} className="text-white/25 mb-1" />
+                <p className="text-white/60 text-[9px]">{doc}</p>
               </motion.button>
             ))}
           </div>
         )}
       </div>
     </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════
+// ORBITAL SEGMENT WRAPPER
+// ═══════════════════════════════════════════════════════
+
+function OrbitalSegment({
+  panelId,
+  config,
+  children,
+}: {
+  panelId: Exclude<PanelId, null>;
+  config: PanelConfig;
+  children: React.ReactNode;
+}) {
+  const zone = ORBITAL_ZONES[panelId];
+  const zoneStyle = ZONE_STYLES[zone];
+  const motion_props = ZONE_MOTION[zone];
+
+  return (
+    <motion.div
+      className="pointer-events-auto z-50"
+      style={zoneStyle}
+      initial={motion_props.initial}
+      animate={{
+        ...motion_props.animate,
+        transition: {
+          duration: 0.45,
+          ease: [0.25, 0.46, 0.45, 0.94],
+        },
+      }}
+      exit={{
+        ...motion_props.exit,
+        transition: { duration: 0.25 },
+      }}
+    >
+      <div
+        className="relative rounded-2xl overflow-hidden h-full"
+        style={{
+          background: 'linear-gradient(180deg, rgba(13, 19, 32, 0.93) 0%, rgba(10, 14, 23, 0.96) 100%)',
+          backdropFilter: 'blur(20px)',
+          border: `1px solid ${config.color}25`,
+          boxShadow: `0 8px 32px rgba(0,0,0,0.4), 0 0 1px ${config.color}30`,
+        }}
+      >
+        <BreathingGlow color={config.color} />
+        <EdgeGlow color={config.color} zone={zone} />
+        <CornerAccents color={config.color} />
+
+        <div className="relative z-10 p-3 h-full">
+          {children}
+        </div>
+      </div>
+    </motion.div>
   );
 }
 
@@ -660,152 +698,75 @@ export function BottomBar() {
 
   const activeConfig = PANELS.find(p => p.id === activePanel);
 
-  // Panel content renderer
-  const renderPanelContent = () => {
-    switch (activePanel) {
-      case 'carousel':
-        return (
-          <CarouselPanel
-            onAgentTap={rotateToAgent}
-            onTouchStart={onPanelTouchStart}
-            onTouchMove={onPanelTouchMove}
-            onTouchEnd={onPanelTouchEnd}
-            onClose={closePanel}
-          />
-        );
-      case 'comms': return <CommPanel onClose={closePanel} />;
-      case 'terminal': return <TerminalPanel onClose={closePanel} />;
-      case 'input': return <InputPanel onClose={closePanel} />;
-      case 'notebook': return <NotebookPanel onClose={closePanel} />;
-      default: return null;
-    }
-  };
-
   return (
-    <div className="fixed bottom-0 left-0 right-0 z-50">
+    <>
       {/* ── Scene Resonance Tint ── */}
       <AnimatePresence>
         {activePanel && activeConfig && (
           <motion.div
             className="fixed inset-0 pointer-events-none z-40"
             style={{
-              background: `radial-gradient(ellipse at 50% 100%, ${activeConfig.color}08 0%, transparent 60%)`,
+              background: (() => {
+                const zone = ORBITAL_ZONES[activeConfig.id];
+                const origins: Record<OrbitalZone, string> = {
+                  'bottom-left': '20% 90%',
+                  right: '95% 50%',
+                  left: '5% 50%',
+                  'bottom-strip': '50% 95%',
+                  'top-right': '90% 15%',
+                };
+                return `radial-gradient(ellipse at ${origins[zone]}, ${activeConfig.color}06 0%, transparent 50%)`;
+              })(),
             }}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            transition={{ duration: 0.6 }}
+            transition={{ duration: 0.5 }}
           />
         )}
       </AnimatePresence>
 
-      {/* ── Materialize Panel ── */}
+      {/* ── Orbital Panel Segments ── */}
       <AnimatePresence>
         {activePanel && activeConfig && (
-          <div className="absolute bottom-[56px] left-3 right-3 pointer-events-auto flex items-end justify-center" style={{ maxHeight: '280px' }}>
-            {/* Materialize particle convergence */}
-            <MaterializeEffect
-              color={activeConfig.color}
-              isActive={!!activePanel}
-            />
-
-            {/* The crystallized panel */}
-            <motion.div
-              className="relative w-full rounded-2xl overflow-hidden"
-              style={{
-                height: '260px',
-                background: 'linear-gradient(180deg, rgba(13, 19, 32, 0.97) 0%, rgba(10, 14, 23, 0.99) 100%)',
-                border: `1px solid ${activeConfig.color}30`,
-                boxShadow: `0 -20px 60px ${activeConfig.glowColor}, 0 0 1px ${activeConfig.color}40, inset 0 1px 0 rgba(255,255,255,0.06)`,
-              }}
-              initial={{
-                opacity: 0,
-                scale: 0.92,
-                filter: 'blur(16px)',
-              }}
-              animate={{
-                opacity: 1,
-                scale: 1,
-                filter: 'blur(0px)',
-                transition: {
-                  duration: 0.45,
-                  ease: [0.25, 0.46, 0.45, 0.94],
-                },
-              }}
-              exit={{
-                opacity: 0,
-                scale: 0.95,
-                filter: 'blur(8px)',
-                transition: { duration: 0.25 },
-              }}
-            >
-              {/* Noise dissolve */}
-              <NoiseOverlay isActive={!!activePanel} />
-
-              {/* Shimmer sweep */}
-              <ShimmerEffect color={activeConfig.color} />
-
-              {/* Top glow line */}
-              <motion.div
-                className="absolute top-0 left-0 right-0 h-px"
-                initial={{ opacity: 0, scaleX: 0 }}
-                animate={{ opacity: 1, scaleX: 1 }}
-                transition={{ delay: 0.15, duration: 0.35 }}
-                style={{
-                  background: `linear-gradient(90deg, transparent, ${activeConfig.color}, transparent)`,
-                  boxShadow: `0 0 20px ${activeConfig.color}`,
-                }}
+          <OrbitalSegment panelId={activeConfig.id} config={activeConfig}>
+            {activePanel === 'carousel' && (
+              <CarouselPanel
+                onAgentTap={rotateToAgent}
+                onTouchStart={onPanelTouchStart}
+                onTouchMove={onPanelTouchMove}
+                onTouchEnd={onPanelTouchEnd}
+                onClose={closePanel}
               />
-
-              {/* Corner accents — crystallization edges */}
-              {[
-                'top-3 left-3 border-l border-t rounded-tl-lg',
-                'top-3 right-3 border-r border-t rounded-tr-lg',
-                'bottom-3 left-3 border-l border-b rounded-bl-lg',
-                'bottom-3 right-3 border-r border-b rounded-br-lg',
-              ].map((cls, i) => (
-                <motion.div
-                  key={i}
-                  className={`absolute w-5 h-5 ${cls} opacity-40`}
-                  style={{ borderColor: activeConfig.color }}
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 0.4 }}
-                  transition={{ delay: 0.2 + i * 0.05 }}
-                />
-              ))}
-
-              {/* Content */}
-              <div className="h-full p-4 relative z-10">
-                {renderPanelContent()}
-              </div>
-            </motion.div>
-          </div>
+            )}
+            {activePanel === 'comms' && <CommPanel onClose={closePanel} />}
+            {activePanel === 'terminal' && <TerminalPanel onClose={closePanel} />}
+            {activePanel === 'input' && <InputPanel onClose={closePanel} />}
+            {activePanel === 'notebook' && <NotebookPanel onClose={closePanel} />}
+          </OrbitalSegment>
         )}
       </AnimatePresence>
 
-      {/* ── Dock Bar with Ambient Particle Field ── */}
-      <div className="relative">
-        <AmbientParticleField activePanel={activePanel} />
-
+      {/* ── Dock — miniature centered capsule ── */}
+      <div className="fixed bottom-3 left-1/2 -translate-x-1/2 z-50">
         <motion.div
-          className="flex items-center justify-center gap-1 px-5 py-1.5 mx-auto w-fit rounded-t-2xl relative z-10"
+          className="flex items-center gap-0.5 px-3 py-1.5 rounded-2xl"
           style={{
-            background: 'linear-gradient(180deg, rgba(16, 22, 36, 0.92) 0%, rgba(10, 14, 23, 0.96) 100%)',
+            background: 'linear-gradient(180deg, rgba(16, 22, 36, 0.88) 0%, rgba(10, 14, 23, 0.94) 100%)',
             backdropFilter: 'blur(16px)',
             border: '1px solid rgba(255, 255, 255, 0.06)',
-            borderBottom: 'none',
-            boxShadow: '0 -6px 30px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.04)',
+            boxShadow: '0 4px 20px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.04)',
           }}
-          initial={{ y: 60, opacity: 0 }}
+          initial={{ y: 50, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
           transition={{ type: 'spring', stiffness: 200, damping: 25, delay: 0.1 }}
         >
           {PANELS.map((panel, i) => (
             <motion.div
               key={panel.id}
-              initial={{ opacity: 0, y: 12 }}
+              initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.15 + i * 0.06 }}
+              transition={{ delay: 0.12 + i * 0.05 }}
             >
               <DockTrigger
                 config={panel}
@@ -816,6 +777,6 @@ export function BottomBar() {
           ))}
         </motion.div>
       </div>
-    </div>
+    </>
   );
 }
