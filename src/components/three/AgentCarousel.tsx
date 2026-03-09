@@ -24,10 +24,10 @@ function useAutoCamera(ringRadius: number) {
     if (bannerOpen) return;
     const aspect = size.width / size.height;
     const fov = 60;
-    const padding = 1.2;
+    const padding = 2.0;
     const z = (ringRadius + padding) /
       (Math.tan(THREE.MathUtils.degToRad(fov / 2)) * aspect);
-    const zClamped = THREE.MathUtils.clamp(z, 7, 15);
+    const zClamped = THREE.MathUtils.clamp(z, 9, 17);
 
     (camera as THREE.PerspectiveCamera).fov = fov;
     camera.position.set(0, 2, zClamped);
