@@ -692,7 +692,7 @@ export function BottomBar() {
       <div
         className="relative w-full pointer-events-auto"
         style={{
-          height: '35vh',
+          height: '22vh',
           perspective: '800px',
           perspectiveOrigin: '50% 100%',
         }}
@@ -708,12 +708,12 @@ export function BottomBar() {
           <ParticleTerrain activePanel={activePanel} />
         </div>
 
-        {/* Gradient fade at top — blends terrain into scene */}
+        {/* Soft fade at very top edge */}
         <div
           className="absolute top-0 left-0 right-0 pointer-events-none"
           style={{
-            height: '40%',
-            background: 'linear-gradient(to bottom, rgba(10, 14, 23, 0.95) 0%, transparent 100%)',
+            height: '15%',
+            background: 'linear-gradient(to bottom, rgba(10, 14, 23, 0.6) 0%, transparent 100%)',
           }}
         />
 
