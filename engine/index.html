@@ -462,7 +462,11 @@
         ::-webkit-scrollbar { width: 3px; }
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: rgba(0,229,255,0.08); border-radius: 2px; }
-    </style>
+    /* Fullscreen button */
+.fs-btn{position:fixed;bottom:20px;right:20px;z-index:99999;width:44px;height:44px;border-radius:50%;border:1px solid rgba(0,229,255,0.3);background:rgba(14,22,38,0.7);backdrop-filter:blur(8px);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all 0.3s ease;opacity:0.6}
+.fs-btn:hover{opacity:1;border-color:rgba(0,229,255,0.7);box-shadow:0 0 15px rgba(0,229,255,0.3)}
+.fs-btn svg{width:20px;height:20px;fill:none;stroke:#00E5FF;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+</style>
 </head>
 <body>
 
@@ -1204,5 +1208,19 @@ initThree();
 </div>
 <!-- /AI3 Navigator Widget -->
 
+<!-- Fullscreen toggle -->
+<button class="fs-btn" id="fsBtn" title="Fullscreen">
+<svg viewBox="0 0 24 24"><path d="M8 3H5a2 2 0 00-2 2v3m18 0V5a2 2 0 00-2-2h-3m0 18h3a2 2 0 002-2v-3M3 16v3a2 2 0 002 2h3"/></svg>
+</button>
+<script>
+(function(){
+  var btn=document.getElementById("fsBtn");
+  var expand='<path d="M8 3H5a2 2 0 00-2 2v3m18 0V5a2 2 0 00-2-2h-3m0 18h3a2 2 0 002-2v-3M3 16v3a2 2 0 002 2h3"/>';
+  var shrink='<path d="M4 14h3a2 2 0 012 2v3m2-16v3a2 2 0 01-2 2H4m16 2h-3a2 2 0 01-2-2V4m2 16v-3a2 2 0 012-2h3"/>';
+  function upd(){var f=document.fullscreenElement||document.webkitFullscreenElement;btn.querySelector("svg").innerHTML=f?shrink:expand}
+  btn.onclick=function(){var f=document.fullscreenElement||document.webkitFullscreenElement;if(f){(document.exitFullscreen||document.webkitExitFullscreen).call(document)}else{var e=document.documentElement;(e.requestFullscreen||e.webkitRequestFullscreen).call(e)}};
+  document.addEventListener("fullscreenchange",upd);document.addEventListener("webkitfullscreenchange",upd);
+})();
+</script>
 </body>
 </html>
