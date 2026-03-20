@@ -1,0 +1,1037 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>AI³ Cockpit</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --cyan: #00E5FF;
+            --purple: #7B2D8E;
+            --orange: #FF6B2B;
+            --dark-bg: #0A0A0F;
+            --dark-surface: #12121A;
+            --dark-surface-alpha: rgba(18, 18, 26, 0.88);
+            --light-text: #FFFFFF;
+            --gray-text: #8B8B9A;
+            --green: #4CAF50;
+            --amber: #FF9800;
+            --red: #F44336;
+            --blue: #2196F3;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--dark-bg);
+            color: var(--light-text);
+            overflow: hidden;
+            height: 100vh;
+            width: 100vw;
+        }
+
+        canvas { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 0; }
+
+        /* ═══ LOADER ═══ */
+        #loader {
+            position: fixed; inset: 0; z-index: 1000;
+            background: var(--dark-bg);
+            display: flex; flex-direction: column;
+            align-items: center; justify-content: center; gap: 20px;
+            transition: opacity 0.8s ease;
+        }
+        #loader.hidden { opacity: 0; pointer-events: none; }
+        .loader-logo {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 36px; font-weight: 700;
+            background: linear-gradient(135deg, var(--cyan), var(--purple));
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+        }
+        .loader-sub { font-size: 12px; color: var(--gray-text); letter-spacing: 3px; text-transform: uppercase; }
+        .loader-bar { width: 200px; height: 2px; background: rgba(255,255,255,0.1); border-radius: 1px; overflow: hidden; }
+        .loader-fill { width: 0%; height: 100%; background: linear-gradient(90deg, var(--cyan), var(--purple)); transition: width 0.3s; }
+
+        /* ═══ OVERLAYS ═══ */
+        /* scanline removed — отвлекает */
+
+        .vignette {
+            position: fixed; inset: 0; pointer-events: none; z-index: 5;
+            background: radial-gradient(ellipse at center, transparent 40%, rgba(0,0,0,0.7) 100%);
+        }
+        .crt-grid {
+            position: fixed; inset: 0; pointer-events: none; z-index: 4;
+            background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,229,255,0.012) 2px, rgba(0,229,255,0.012) 4px);
+            mix-blend-mode: screen;
+        }
+
+        /* ═══ TOPBAR ═══ */
+        .topbar {
+            position: fixed; top: 0; left: 0; right: 0; z-index: 30;
+            padding: 14px 24px;
+            display: flex; align-items: center; justify-content: space-between;
+            background: linear-gradient(180deg, rgba(10,10,15,0.9) 0%, transparent 100%);
+        }
+        .topbar-left { display: flex; align-items: center; gap: 12px; }
+        .logo-badge {
+            width: 36px; height: 36px; border-radius: 8px;
+            background: linear-gradient(135deg, var(--cyan), var(--purple));
+            display: flex; align-items: center; justify-content: center;
+            font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 11px;
+            box-shadow: 0 0 16px rgba(0,229,255,0.3);
+            animation: badge-glow 3s ease-in-out infinite;
+        }
+        @keyframes badge-glow { 0%,100%{box-shadow:0 0 16px rgba(0,229,255,0.3)} 50%{box-shadow:0 0 24px rgba(0,229,255,0.6),0 0 48px rgba(123,45,142,0.2)} }
+        .topbar-title {
+            font-size: 16px; font-weight: 800; letter-spacing: -0.3px;
+            background: linear-gradient(135deg, var(--cyan), var(--purple));
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+        }
+        .topbar-right { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+        .mode-bar {
+            display: flex; gap: 2px; padding: 3px;
+            background: rgba(255,255,255,0.04); border-radius: 8px;
+            border: 1px solid rgba(255,255,255,0.06);
+        }
+        .mode-btn {
+            padding: 5px 10px; border-radius: 6px; border: none;
+            font-family: 'Inter', sans-serif; font-size: 10px; font-weight: 600;
+            color: var(--gray-text); background: transparent; cursor: pointer;
+            transition: all 0.2s; letter-spacing: 0.3px; white-space: nowrap;
+        }
+        .mode-btn.active { background: rgba(0,229,255,0.12); color: var(--cyan); }
+        .mode-btn:hover:not(.active) { color: var(--light-text); }
+        .status-pill {
+            display: flex; align-items: center; gap: 6px;
+            padding: 5px 12px; border-radius: 20px;
+            background: rgba(0,229,255,0.06); border: 1px solid rgba(0,229,255,0.12);
+            font-size: 10px; font-weight: 600; color: var(--cyan);
+            letter-spacing: 0.5px; text-transform: uppercase; white-space: nowrap;
+        }
+        .status-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--green); box-shadow: 0 0 6px var(--green); animation: pulse 2s infinite; }
+        @keyframes pulse { 0%,100%{transform:scale(1);opacity:1} 50%{transform:scale(1.5);opacity:0.5} }
+        .hud-time { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--gray-text); }
+        .hud-time .val { color: var(--cyan); }
+
+        /* ═══ AVATAR CAROUSEL (как на сайте — 4 планеты сверху) ═══ */
+        .avatar-strip {
+            position: fixed; top: 60px; left: 50%; transform: translateX(-50%);
+            z-index: 20; display: flex; gap: 32px; align-items: flex-start;
+            padding: 8px 20px;
+        }
+        .avatar-slot {
+            display: flex; flex-direction: column; align-items: center; gap: 6px;
+            cursor: pointer; transition: transform 0.3s;
+            width: 64px; flex-shrink: 0;
+        }
+        .avatar-slot:hover { transform: translateY(-3px); }
+        .avatar-slot.speaking { transform: translateY(-3px); }
+        .avatar-orb {
+            width: 52px; height: 52px; border-radius: 50%; position: relative;
+            display: flex; align-items: center; justify-content: center;
+            transition: all 0.3s;
+        }
+        .avatar-orb::before {
+            content: ''; position: absolute; inset: -3px; border-radius: 50%;
+            border: 1.5px solid transparent; transition: all 0.3s;
+        }
+        .avatar-slot.speaking .avatar-orb::before {
+            border-color: var(--cyan);
+            box-shadow: 0 0 20px rgba(0,229,255,0.4);
+            animation: pulse-ring 2s ease-in-out infinite;
+        }
+        @keyframes pulse-ring { 0%,100%{box-shadow:0 0 20px rgba(0,229,255,0.4)} 50%{box-shadow:0 0 35px rgba(0,229,255,0.7)} }
+        .avatar-orb-inner {
+            width: 100%; height: 100%; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            overflow: hidden;
+        }
+
+        /* ═══ KIMI ORBITAL LOGO (compact) ═══ */
+        .kimi-orbital {
+            position: relative; width: 44px; height: 44px;
+        }
+        .kimi-orbital .k-core {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            width: 14px; height: 14px; border-radius: 50%;
+            background: radial-gradient(circle at 35% 35%, var(--ac), color-mix(in srgb, var(--ac) 60%, #000));
+            box-shadow: 0 0 8px var(--ac), 0 0 16px color-mix(in srgb, var(--ac) 40%, transparent);
+            z-index: 3;
+            animation: kCorePulse 3s ease-in-out infinite;
+        }
+        @keyframes kCorePulse {
+            0%,100% { transform: translate(-50%,-50%) scale(1); box-shadow: 0 0 8px var(--ac), 0 0 16px color-mix(in srgb, var(--ac) 40%, transparent); }
+            50% { transform: translate(-50%,-50%) scale(1.12); box-shadow: 0 0 12px var(--ac), 0 0 24px color-mix(in srgb, var(--ac) 60%, transparent); }
+        }
+        .kimi-orbital .k-orbit {
+            position: absolute; top: 50%; left: 50%;
+            border: 1px solid color-mix(in srgb, var(--ac) 35%, transparent);
+            border-radius: 50%;
+        }
+        .kimi-orbital .k-o1 {
+            width: 26px; height: 26px;
+            animation: kOrbit1 6s linear infinite;
+        }
+        .kimi-orbital .k-o2 {
+            width: 36px; height: 36px;
+            border-color: color-mix(in srgb, var(--ac) 25%, transparent);
+            animation: kOrbit2 9s linear infinite;
+        }
+        .kimi-orbital .k-o3 {
+            width: 44px; height: 44px;
+            animation: kOrbit3 13s linear infinite;
+        }
+        @keyframes kOrbit1 { from { transform: translate(-50%,-50%) rotateX(60deg) rotateZ(0deg); } to { transform: translate(-50%,-50%) rotateX(60deg) rotateZ(360deg); } }
+        @keyframes kOrbit2 { from { transform: translate(-50%,-50%) rotateX(45deg) rotateY(30deg) rotateZ(0deg); } to { transform: translate(-50%,-50%) rotateX(45deg) rotateY(30deg) rotateZ(360deg); } }
+        @keyframes kOrbit3 { from { transform: translate(-50%,-50%) rotateX(30deg) rotateY(-20deg) rotateZ(0deg); } to { transform: translate(-50%,-50%) rotateX(30deg) rotateY(-20deg) rotateZ(-360deg); } }
+        .kimi-orbital .k-dot {
+            position: absolute; width: 4px; height: 4px; border-radius: 50%;
+            background: var(--ac); box-shadow: 0 0 4px var(--ac);
+        }
+        .kimi-orbital .k-o1 .k-dot { top: 0; left: 50%; transform: translateX(-50%); }
+        .kimi-orbital .k-o2 .k-dot { top: 50%; right: 0; transform: translateY(-50%); }
+        .kimi-orbital .k-o3 .k-dot { bottom: 0; left: 50%; transform: translateX(-50%); }
+        .kimi-orbital .k-pulse {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
+            border: 1px solid var(--ac); border-radius: 50%;
+            opacity: 0; width: 14px; height: 14px;
+        }
+        .kimi-orbital .k-p1 { animation: kPulse 3s ease-out infinite; }
+        .kimi-orbital .k-p2 { animation: kPulse 3s ease-out infinite 1s; }
+        @keyframes kPulse {
+            0% { transform: translate(-50%,-50%) scale(1); opacity: 0.6; }
+            100% { transform: translate(-50%,-50%) scale(3.2); opacity: 0; }
+        }
+        .avatar-name { font-size: 10px; font-weight: 600; color: var(--gray-text); letter-spacing: 0.3px; }
+        .avatar-slot.speaking .avatar-name { color: var(--light-text); }
+        .avatar-status-dot {
+            position: absolute; bottom: 0; right: 0;
+            width: 10px; height: 10px; border-radius: 50%;
+            border: 2px solid var(--dark-bg);
+        }
+
+        /* ═══ HUMAN PRESENCE POINTS ═══ */
+        .human-presence {
+            position: fixed; top: 50%; transform: translateY(-50%);
+            z-index: 15; display: flex; flex-direction: column;
+            align-items: center; gap: 6px; opacity: 0.5;
+            transition: opacity 0.3s;
+        }
+        .human-presence:hover { opacity: 0.8; }
+        .human-presence.left { left: 20px; }
+        .human-presence.right { right: 20px; }
+        .human-avatar {
+            width: 40px; height: 40px; border-radius: 50%;
+            background: rgba(255,255,255,0.06);
+            border: 1px solid rgba(255,255,255,0.1);
+            display: flex; align-items: center; justify-content: center;
+            font-size: 16px;
+        }
+        .human-label {
+            font-size: 9px; color: var(--gray-text);
+            font-weight: 500; letter-spacing: 0.5px;
+            writing-mode: vertical-rl; text-orientation: mixed;
+        }
+
+        /* ═══ BOTTOM DOCK (5 панелей) ═══ */
+        .bottom-dock {
+            position: fixed; bottom: 0; left: 0; right: 0;
+            z-index: 40; display: flex; justify-content: center;
+            padding-bottom: 12px;
+        }
+        .dock-bar {
+            display: flex; align-items: center; gap: 4px;
+            padding: 8px 14px; border-radius: 20px;
+            background: rgba(10, 14, 23, 0.92);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255,255,255,0.08);
+            box-shadow: 0 -8px 32px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.04);
+        }
+        .dock-btn {
+            display: flex; flex-direction: column; align-items: center; gap: 3px;
+            padding: 8px 14px; border-radius: 14px;
+            border: none; background: transparent;
+            cursor: pointer; transition: all 0.25s; position: relative;
+            font-family: 'Inter', sans-serif;
+        }
+        .dock-btn:hover { background: rgba(255,255,255,0.04); }
+        .dock-btn.active { background: rgba(0,229,255,0.1); }
+        .dock-icon {
+            width: 28px; height: 28px; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            transition: all 0.25s;
+            background: rgba(255,255,255,0.04);
+            overflow: hidden;
+        }
+        .dock-btn.active .dock-icon {
+            box-shadow: 0 0 16px var(--panel-color, rgba(0,229,255,0.4));
+        }
+
+        /* ═══ KIMI ORBITAL MICRO (dock buttons) ═══ */
+        .kimi-micro {
+            position: relative; width: 24px; height: 24px;
+        }
+        .kimi-micro .km-core {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            width: 6px; height: 6px; border-radius: 50%;
+            background: var(--ac);
+            box-shadow: 0 0 4px var(--ac);
+            z-index: 3;
+            animation: kmPulse 3s ease-in-out infinite;
+        }
+        @keyframes kmPulse {
+            0%,100% { transform: translate(-50%,-50%) scale(1); }
+            50% { transform: translate(-50%,-50%) scale(1.2); box-shadow: 0 0 6px var(--ac); }
+        }
+        .kimi-micro .km-orbit {
+            position: absolute; top: 50%; left: 50%;
+            border: 0.8px solid color-mix(in srgb, var(--ac) 40%, transparent);
+            border-radius: 50%;
+        }
+        .kimi-micro .km-o1 {
+            width: 14px; height: 14px;
+            animation: kOrbit1 6s linear infinite;
+        }
+        .kimi-micro .km-o2 {
+            width: 20px; height: 20px;
+            border-color: color-mix(in srgb, var(--ac) 30%, transparent);
+            animation: kOrbit2 9s linear infinite;
+        }
+        .kimi-micro .km-dot {
+            position: absolute; width: 2.5px; height: 2.5px; border-radius: 50%;
+            background: var(--ac); box-shadow: 0 0 3px var(--ac);
+        }
+        .kimi-micro .km-o1 .km-dot { top: 0; left: 50%; transform: translateX(-50%); }
+        .kimi-micro .km-o2 .km-dot { top: 50%; right: 0; transform: translateY(-50%); }
+        .dock-label { font-size: 9px; font-weight: 600; color: var(--gray-text); transition: color 0.2s; }
+        .dock-btn.active .dock-label { color: var(--light-text); }
+        .dock-notif {
+            position: absolute; top: 4px; right: 10px;
+            width: 7px; height: 7px; border-radius: 50%;
+            background: var(--red); border: 1.5px solid rgba(10,14,23,0.9);
+            animation: pulse 1.5s infinite;
+        }
+        .dock-indicator {
+            position: absolute; bottom: 2px;
+            width: 16px; height: 2px; border-radius: 1px;
+            transition: all 0.3s;
+        }
+        .dock-btn.active .dock-indicator { background: var(--panel-color, var(--cyan)); }
+
+        /* ═══ SLIDE-UP PANEL ═══ */
+        .panel-backdrop {
+            position: fixed; inset: 0; z-index: 35;
+            background: rgba(0,0,0,0.4); backdrop-filter: blur(4px);
+            opacity: 0; pointer-events: none; transition: opacity 0.3s;
+        }
+        .panel-backdrop.visible { opacity: 1; pointer-events: auto; }
+
+        .slide-panel {
+            position: fixed; bottom: 76px; left: 16px; right: 16px;
+            z-index: 36; height: 380px;
+            border-radius: 20px; overflow: hidden;
+            background: linear-gradient(180deg, rgba(13,19,32,0.98), rgba(10,14,23,0.99));
+            border: 1px solid rgba(0,229,255,0.15);
+            box-shadow: 0 -20px 60px rgba(0,0,0,0.5);
+            transform: translateY(110%); opacity: 0;
+            transition: transform 0.45s cubic-bezier(0.4,0,0.2,1), opacity 0.3s;
+        }
+        .slide-panel.visible {
+            transform: translateY(0); opacity: 1;
+        }
+        .slide-panel::before {
+            content: ''; position: absolute; top: 0; left: 0; right: 0; height: 1px;
+            background: linear-gradient(90deg, transparent, var(--cyan), transparent);
+        }
+
+        .panel-content {
+            height: 100%; padding: 20px 24px;
+            display: flex; flex-direction: column;
+        }
+        .panel-header {
+            display: flex; align-items: center; justify-content: space-between;
+            margin-bottom: 16px;
+        }
+        .panel-title {
+            font-size: 13px; font-weight: 700; text-transform: uppercase;
+            letter-spacing: 1.5px;
+            background: linear-gradient(135deg, var(--cyan), var(--purple));
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+        }
+        .panel-close {
+            width: 28px; height: 28px; border-radius: 8px;
+            border: 1px solid rgba(255,255,255,0.08);
+            background: rgba(255,255,255,0.04);
+            color: var(--gray-text); font-size: 14px;
+            cursor: pointer; display: flex; align-items: center; justify-content: center;
+            transition: all 0.2s;
+        }
+        .panel-close:hover { border-color: var(--cyan); color: var(--cyan); }
+        .panel-body { flex: 1; overflow-y: auto; }
+
+        /* ═══ PANEL: AVATARS ═══ */
+        .avatars-grid { display: flex; gap: 16px; flex-wrap: wrap; justify-content: center; padding-top: 12px; }
+        .avatar-card {
+            display: flex; flex-direction: column; align-items: center; gap: 8px;
+            padding: 16px 20px; border-radius: 14px;
+            background: rgba(255,255,255,0.03);
+            border: 1px solid rgba(255,255,255,0.05);
+            cursor: pointer; transition: all 0.2s; min-width: 100px;
+        }
+        .avatar-card:hover { background: rgba(0,229,255,0.04); border-color: rgba(0,229,255,0.15); transform: translateY(-2px); }
+        .avatar-card-orb {
+            width: 48px; height: 48px; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 20px;
+        }
+        .avatar-card-orb svg {
+            width: 26px; height: 26px;
+        }
+        .avatar-card-name { font-size: 12px; font-weight: 600; }
+        .avatar-card-role { font-size: 10px; color: var(--gray-text); text-align: center; }
+        .avatar-card-status {
+            font-family: 'JetBrains Mono', monospace; font-size: 9px;
+            text-transform: uppercase; letter-spacing: 0.5px;
+        }
+
+        /* ═══ PANEL: COMM ═══ */
+        .comm-msg {
+            display: flex; align-items: flex-start; gap: 10px;
+            padding: 10px 12px; border-radius: 10px;
+            background: rgba(255,255,255,0.02);
+            border-left: 2px solid var(--cyan);
+            margin-bottom: 8px; transition: background 0.2s;
+        }
+        .comm-msg:hover { background: rgba(0,229,255,0.03); }
+        .comm-route {
+            font-family: 'JetBrains Mono', monospace; font-size: 10px;
+            color: var(--cyan); white-space: nowrap; min-width: 90px;
+        }
+        .comm-route .arr { color: var(--gray-text); }
+        .comm-body { flex: 1; min-width: 0; }
+        .comm-topic { font-size: 12px; font-weight: 600; }
+        .comm-text { font-size: 11px; color: var(--gray-text); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .comm-time { font-family: 'JetBrains Mono', monospace; font-size: 9px; color: var(--gray-text); opacity: 0.5; white-space: nowrap; }
+        .comm-input-row {
+            display: flex; gap: 8px; margin-top: auto; padding-top: 12px;
+            border-top: 1px solid rgba(255,255,255,0.05);
+        }
+        .comm-input {
+            flex: 1; padding: 10px 14px; border-radius: 10px;
+            background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08);
+            color: var(--light-text); font-family: 'Inter', sans-serif; font-size: 12px;
+            outline: none; transition: border-color 0.2s;
+        }
+        .comm-input:focus { border-color: rgba(0,229,255,0.3); }
+        .comm-input::placeholder { color: rgba(255,255,255,0.25); }
+        .comm-send {
+            padding: 10px 16px; border-radius: 10px; border: none;
+            background: linear-gradient(135deg, var(--cyan), var(--purple));
+            color: white; font-weight: 600; font-size: 12px;
+            cursor: pointer; transition: transform 0.15s; font-family: 'Inter', sans-serif;
+        }
+        .comm-send:hover { transform: scale(1.03); }
+        .comm-send:active { transform: scale(0.97); }
+
+        /* Routing buttons row */
+        .routing-row {
+            display: flex; gap: 6px; margin-bottom: 12px; flex-wrap: wrap;
+        }
+        .route-chip {
+            padding: 5px 10px; border-radius: 8px;
+            background: rgba(255,255,255,0.04);
+            border: 1px solid rgba(255,255,255,0.06);
+            font-size: 10px; font-weight: 600; color: var(--gray-text);
+            cursor: pointer; transition: all 0.2s;
+            font-family: 'JetBrains Mono', monospace;
+        }
+        .route-chip:hover { border-color: var(--cyan); color: var(--cyan); background: rgba(0,229,255,0.06); }
+        .route-chip.active { border-color: var(--cyan); color: var(--cyan); background: rgba(0,229,255,0.1); }
+
+        /* ═══ PANEL: CODE/TERMINAL ═══ */
+        .terminal-tabs { display: flex; gap: 4px; margin-bottom: 10px; }
+        .terminal-tab {
+            padding: 5px 12px; border-radius: 8px; border: none;
+            background: rgba(255,255,255,0.04); color: var(--gray-text);
+            font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 600;
+            cursor: pointer; transition: all 0.2s;
+        }
+        .terminal-tab.active { background: rgba(76,175,80,0.15); color: var(--green); }
+        .terminal-output {
+            flex: 1; padding: 14px; border-radius: 10px;
+            background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.06);
+            font-family: 'JetBrains Mono', monospace; font-size: 11px;
+            line-height: 1.8; overflow-y: auto;
+        }
+        .term-green { color: #4CAF50; }
+        .term-cyan { color: var(--cyan); }
+        .term-blue { color: #42A5F5; }
+        .term-yellow { color: #FFCA28; }
+        .term-gray { color: rgba(255,255,255,0.5); }
+        .term-cursor { display: inline-block; animation: blink 1s infinite; }
+        @keyframes blink { 0%,50%{opacity:1} 51%,100%{opacity:0} }
+
+        /* ═══ PANEL: INPUT ═══ */
+        .input-area {
+            flex: 1; padding: 14px; border-radius: 12px;
+            background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08);
+            color: var(--light-text); font-family: 'Inter', sans-serif; font-size: 13px;
+            line-height: 1.6; resize: none; outline: none;
+            transition: border-color 0.2s;
+        }
+        .input-area:focus { border-color: rgba(0,229,255,0.25); }
+        .input-area::placeholder { color: rgba(255,255,255,0.2); }
+        .input-controls {
+            display: flex; align-items: center; gap: 10px;
+            margin-top: 12px;
+        }
+        .input-mode-btn {
+            width: 44px; height: 44px; border-radius: 12px;
+            border: 1px solid rgba(255,255,255,0.08);
+            background: rgba(255,255,255,0.04);
+            color: var(--gray-text); font-size: 16px;
+            cursor: pointer; display: flex; align-items: center; justify-content: center;
+            transition: all 0.2s;
+        }
+        .input-mode-btn:hover { border-color: var(--cyan); color: var(--cyan); }
+        .input-mode-btn.recording { background: rgba(244,67,54,0.15); border-color: var(--red); color: var(--red); animation: pulse 1.5s infinite; }
+        .input-send-btn {
+            flex: 1; height: 44px; border-radius: 12px; border: none;
+            background: linear-gradient(135deg, rgba(0,229,255,0.2), rgba(123,45,142,0.2));
+            border: 1px solid rgba(0,229,255,0.2);
+            color: var(--light-text); font-weight: 600; font-size: 13px;
+            cursor: pointer; transition: all 0.2s;
+            font-family: 'Inter', sans-serif;
+        }
+        .input-send-btn:hover { background: linear-gradient(135deg, rgba(0,229,255,0.3), rgba(123,45,142,0.3)); }
+
+        /* ═══ PANEL: NOTES ═══ */
+        .notes-tabs { display: flex; gap: 6px; margin-bottom: 12px; }
+        .notes-tab {
+            padding: 6px 14px; border-radius: 8px; border: none;
+            background: rgba(255,255,255,0.04); color: var(--gray-text);
+            font-size: 11px; font-weight: 600; cursor: pointer; transition: all 0.2s;
+            font-family: 'Inter', sans-serif;
+        }
+        .notes-tab.active { background: rgba(255,193,7,0.12); color: #FFC107; }
+        .note-entry {
+            padding: 10px 12px; border-radius: 10px;
+            background: rgba(255,255,255,0.02); margin-bottom: 8px;
+        }
+        .note-time { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--gray-text); opacity: 0.6; margin-bottom: 4px; }
+        .note-text { font-size: 12px; line-height: 1.5; color: rgba(255,255,255,0.8); }
+        .doc-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+        .doc-card {
+            padding: 12px; border-radius: 10px;
+            background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.05);
+            cursor: pointer; transition: all 0.2s;
+        }
+        .doc-card:hover { background: rgba(255,193,7,0.04); border-color: rgba(255,193,7,0.15); }
+        .doc-card-icon { font-size: 18px; margin-bottom: 6px; }
+        .doc-card-name { font-size: 11px; font-weight: 600; }
+
+        /* ═══ ANIMATION VARIANT TOGGLE ═══ */
+        /* variant-toggle removed — не нужен на рабочей странице */
+
+        /* Scrollbar */
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(0,229,255,0.1); border-radius: 2px; }
+    /* Fullscreen button */
+.fs-btn{position:fixed;bottom:20px;right:20px;z-index:99999;width:44px;height:44px;border-radius:50%;border:1px solid rgba(0,229,255,0.3);background:rgba(14,22,38,0.7);backdrop-filter:blur(8px);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all 0.3s ease;opacity:0.6}
+.fs-btn:hover{opacity:1;border-color:rgba(0,229,255,0.7);box-shadow:0 0 15px rgba(0,229,255,0.3)}
+.fs-btn svg{width:20px;height:20px;fill:none;stroke:#00E5FF;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+</style>
+</head>
+<body>
+
+<!-- LOADER -->
+<div id="loader">
+    <div class="loader-logo">AI³</div>
+    <div class="loader-sub">Cockpit</div>
+    <div class="loader-bar"><div class="loader-fill" id="loader-fill"></div></div>
+</div>
+
+<!-- OVERLAYS -->
+<div class="vignette"></div>
+<div class="crt-grid"></div>
+<!-- scanline removed -->
+
+<!-- TOPBAR -->
+<div class="topbar">
+    <div class="topbar-left">
+        <div class="logo-badge">AI³</div>
+        <div class="topbar-title">Cockpit</div>
+    </div>
+    <div class="topbar-right">
+        <div class="mode-bar">
+            <button class="mode-btn active">Sources</button>
+            <button class="mode-btn">Total: 24</button>
+            <button class="mode-btn">Active: 18</button>
+        </div>
+        <div class="status-pill"><span class="status-dot"></span>Session Active</div>
+        <div class="hud-time"><span class="val" id="clock">--:--</span></div>
+    </div>
+</div>
+
+<!-- variant-toggle removed -->
+
+<!-- AVATAR CAROUSEL (4 AI agents like on the site) -->
+<div class="avatar-strip" id="avatar-strip"></div>
+
+<!-- HUMAN PRESENCE POINTS -->
+<div class="human-presence left">
+    <div class="human-avatar">👤</div>
+    <div class="human-label">PARTNER</div>
+</div>
+<div class="human-presence right">
+    <div class="human-avatar">👥</div>
+    <div class="human-label">GUEST</div>
+</div>
+
+<!-- PANEL BACKDROP -->
+<div class="panel-backdrop" id="panel-backdrop" onclick="closePanel()"></div>
+
+<!-- SLIDE-UP PANEL -->
+<div class="slide-panel" id="slide-panel">
+    <div class="panel-content" id="panel-content"></div>
+</div>
+
+<!-- BOTTOM DOCK -->
+<div class="bottom-dock">
+    <div class="dock-bar" id="dock-bar"></div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════
+// CONFIG & DATA
+// ═══════════════════════════════════════════════
+
+// Adaptive Mode: same entities as Engine, but colors change by situation
+// Finance was red (#FF5722) in Engine — here it's green (#4CAF50) = resolved
+// Marketing was idle — here it's active (situation changed)
+// Kimi orbital logo — одинаковая структура, цвет через CSS var --ac
+function kimiOrbital() {
+    return `<div class="kimi-orbital"><div class="k-core"></div><div class="k-orbit k-o1"><div class="k-dot"></div></div><div class="k-orbit k-o2"><div class="k-dot"></div></div><div class="k-orbit k-o3"><div class="k-dot"></div></div><div class="k-pulse k-p1"></div><div class="k-pulse k-p2"></div></div>`;
+}
+// Micro version for dock buttons
+function kimiMicro() {
+    return `<div class="kimi-micro"><div class="km-core"></div><div class="km-orbit km-o1"><div class="km-dot"></div></div><div class="km-orbit km-o2"><div class="km-dot"></div></div></div>`;
+}
+
+const AVATARS = [
+    { id: 'product',    name: 'Product',    model: 'Strategy Engine', color: '#6C56FF', gradient: 'radial-gradient(circle, rgba(108,86,255,0.4), rgba(108,86,255,0.1) 60%, transparent)', status: 'active' },
+    { id: 'finance',    name: 'Finance',    model: 'Analytics Core',  color: '#4CAF50', gradient: 'radial-gradient(circle, rgba(76,175,80,0.4), rgba(76,175,80,0.1) 60%, transparent)', status: 'active' },
+    { id: 'marketing',  name: 'Marketing',  model: 'Growth Module',   color: '#00BCD4', gradient: 'radial-gradient(circle, rgba(0,188,212,0.4), rgba(0,188,212,0.1) 60%, transparent)', status: 'processing' },
+    { id: 'management', name: 'Management', model: 'Ops Controller',  color: '#9C27B0', gradient: 'radial-gradient(circle, rgba(156,39,176,0.4), rgba(156,39,176,0.1) 60%, transparent)', status: 'idle' },
+];
+
+const PANELS_CFG = [
+    { id: 'avatars',  label: 'Avatars',  color: '#6C56FF', svgIcon: '<circle cx="12" cy="12" r="3" fill="currentColor" opacity="0.9"/><circle cx="12" cy="12" r="7" fill="none" stroke-dasharray="3 2"/><circle cx="12" cy="12" r="10" fill="none" stroke-dasharray="2 3"/><circle cx="19" cy="5" r="1.2" fill="currentColor" opacity="0.7"/><circle cx="5" cy="19" r="1.2" fill="currentColor" opacity="0.7"/><circle cx="19" cy="18" r="1" fill="currentColor" opacity="0.5"/><circle cx="5" cy="6" r="1" fill="currentColor" opacity="0.5"/>' },
+    { id: 'comm',     label: 'Stage 1',  color: '#00E5FF', svgIcon: '<circle cx="12" cy="12" r="3" fill="currentColor" opacity="0.9"/><ellipse cx="12" cy="12" rx="9" ry="5" fill="none" transform="rotate(-30 12 12)"/><circle cx="18" cy="7" r="1.2" fill="currentColor" opacity="0.7"/>', notif: true },
+    { id: 'code',     label: 'Stage 2',  color: '#7B2D8E', svgIcon: '<circle cx="12" cy="12" r="2.5" fill="currentColor" opacity="0.9"/><ellipse cx="12" cy="12" rx="9" ry="4.5" fill="none" transform="rotate(-30 12 12)"/><ellipse cx="12" cy="12" rx="9" ry="4.5" fill="none" transform="rotate(40 12 12)"/><circle cx="18" cy="7" r="1" fill="currentColor" opacity="0.6"/><circle cx="6" cy="17" r="1" fill="currentColor" opacity="0.6"/>' },
+    { id: 'input',    label: 'Stage 3',  color: '#FF6B2B', svgIcon: '<circle cx="12" cy="12" r="2" fill="currentColor" opacity="0.9"/><ellipse cx="12" cy="12" rx="9" ry="4" fill="none" transform="rotate(-25 12 12)"/><ellipse cx="12" cy="12" rx="9" ry="4" fill="none" transform="rotate(35 12 12)"/><ellipse cx="12" cy="12" rx="9" ry="4" fill="none" transform="rotate(95 12 12)"/><circle cx="19" cy="8" r="1" fill="currentColor" opacity="0.5"/><circle cx="5" cy="16" r="1" fill="currentColor" opacity="0.5"/><circle cx="15" cy="19" r="1" fill="currentColor" opacity="0.5"/>' },
+    { id: 'notes',    label: 'Manual',   color: '#FFC107', svgIcon: '<circle cx="12" cy="12" r="2.5" fill="currentColor" opacity="0.9"/><ellipse cx="12" cy="12" rx="8" ry="4" fill="none" transform="rotate(45 12 12)"/><path d="M12 4v2M12 18v2M4 12h2M18 12h2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>' },
+];
+
+const MESSAGES = [
+    { from: 'Human', to: 'Product', text: 'Фокус на модели ценообразования', time: '14:35' },
+    { from: 'Product', to: 'Marketing', text: 'Проанализируй риски текущей модели', time: '14:36' },
+    { from: 'Marketing', to: 'Finance', text: 'Предложены альтернативные подходы', time: '14:37' },
+    { from: 'Finance', to: 'Management', text: 'Уточни и доработай подход', time: '14:38' },
+    { from: 'Management', to: 'Product', text: 'Готов вариант с тремя тарифами', time: '14:40' },
+];
+
+const NOTES = [
+    { time: '14:35 — Iteration 7', text: 'Фокус сместился на enterprise pricing model. LTV:CAC выглядит перспективно.' },
+    { time: '14:42 — Red Team Input', text: 'Выявлен риск: SMB сегмент может быть недостаточно охвачен.' },
+    { time: '14:50 — Checkpoint', text: 'Все агенты согласованы. Переходим к детализации трёхуровневой модели.' },
+];
+
+let currentPanel = null;
+// animVariant removed — всегда slide
+let speakingAvatar = 'product';
+
+// ═══════════════════════════════════════════════
+// THREE.JS — Möbius + Starfield
+// ═══════════════════════════════════════════════
+
+let scene, camera, renderer, mobiusMesh, time = 0;
+
+function initThree() {
+    scene = new THREE.Scene();
+    scene.fog = new THREE.FogExp2(0x0A0A0F, 0.015);
+
+    camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 500);
+    camera.position.set(0, 2, 12);
+    camera.lookAt(0, 0, 0);
+
+    renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'high-performance' });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.2;
+    document.body.prepend(renderer.domElement);
+
+    // Lights
+    scene.add(new THREE.AmbientLight(0x0A0A0F, 0.5));
+    const l1 = new THREE.PointLight(0x00E5FF, 1.2, 50);
+    l1.position.set(8, 10, 8);
+    scene.add(l1);
+    const l2 = new THREE.PointLight(0x7B2D8E, 0.8, 50);
+    l2.position.set(-8, 5, -8);
+    scene.add(l2);
+
+    buildStarfield();
+    buildMobius();
+
+    window.addEventListener('resize', () => {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    animate();
+}
+
+function buildStarfield() {
+    const count = 1200;
+    const geo = new THREE.BufferGeometry();
+    const pos = new Float32Array(count * 3);
+    const cols = new Float32Array(count * 3);
+    const palette = [new THREE.Color(0x00E5FF), new THREE.Color(0x7B2D8E), new THREE.Color(0xFFFFFF), new THREE.Color(0x8B8B9A)];
+    for (let i = 0; i < count; i++) {
+        const r = 30 + Math.random() * 80;
+        const theta = Math.random() * Math.PI * 2;
+        const phi = Math.acos(2 * Math.random() - 1);
+        pos[i*3] = r * Math.sin(phi) * Math.cos(theta);
+        pos[i*3+1] = r * Math.sin(phi) * Math.sin(theta);
+        pos[i*3+2] = r * Math.cos(phi);
+        const c = palette[Math.floor(Math.random() * palette.length)];
+        cols[i*3] = c.r; cols[i*3+1] = c.g; cols[i*3+2] = c.b;
+    }
+    geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    geo.setAttribute('color', new THREE.BufferAttribute(cols, 3));
+    const mat = new THREE.PointsMaterial({ size: 0.15, vertexColors: true, transparent: true, opacity: 0.6, blending: THREE.AdditiveBlending, depthWrite: false });
+    const stars = new THREE.Points(geo, mat);
+    stars.userData.isStarfield = true;
+    scene.add(stars);
+}
+
+function buildMobius() {
+    const geo = new THREE.BufferGeometry();
+    const verts = [], uvs = [], indices = [];
+    const R = 2.5, tube = 0.5, us = 80, vs = 20;
+    for (let i = 0; i <= us; i++) {
+        const u = (i / us) * Math.PI * 2;
+        for (let j = 0; j <= vs; j++) {
+            const v = (j / vs) * 2 - 1;
+            const x = (R + tube * v * Math.cos(u / 2)) * Math.cos(u);
+            const y = (R + tube * v * Math.cos(u / 2)) * Math.sin(u);
+            const z = tube * v * Math.sin(u / 2);
+            verts.push(x, y, z);
+            uvs.push(i / us, j / vs);
+        }
+    }
+    for (let i = 0; i < us; i++) {
+        for (let j = 0; j < vs; j++) {
+            const a = i * (vs + 1) + j;
+            const b = (i + 1) * (vs + 1) + j;
+            const c = (i + 1) * (vs + 1) + (j + 1);
+            const d = i * (vs + 1) + (j + 1);
+            indices.push(a, b, d, b, c, d);
+        }
+    }
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3));
+    geo.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+    geo.setIndex(indices);
+    geo.computeVertexNormals();
+
+    const mat = new THREE.ShaderMaterial({
+        uniforms: { uTime: {value:0}, uColor1: {value: new THREE.Color(0x00E5FF)}, uColor2: {value: new THREE.Color(0x7B2D8E)} },
+        vertexShader: `varying vec2 vUv; varying vec3 vNormal; void main(){ vUv=uv; vNormal=normalize(normalMatrix*normal); gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }`,
+        fragmentShader: `
+            uniform float uTime; uniform vec3 uColor1; uniform vec3 uColor2;
+            varying vec2 vUv; varying vec3 vNormal;
+            void main(){
+                float flow=sin(vUv.x*6.28318+uTime*0.5)*0.5+0.5;
+                vec3 color=mix(uColor1,uColor2,flow);
+                vec3 viewDir=normalize(cameraPosition-vNormal);
+                float fresnel=pow(1.0-abs(dot(viewDir,vNormal)),2.0);
+                float alpha=0.6+fresnel*0.4;
+                gl_FragColor=vec4(color+fresnel*0.3,alpha);
+            }`,
+        transparent: true, side: THREE.DoubleSide, depthWrite: false, blending: THREE.AdditiveBlending
+    });
+    mobiusMesh = new THREE.Mesh(geo, mat);
+    mobiusMesh.rotation.x = Math.PI / 2;
+    scene.add(mobiusMesh);
+
+    // Core glow sphere
+    const coreGeo = new THREE.SphereGeometry(0.8, 32, 32);
+    const coreMat = new THREE.MeshBasicMaterial({ color: 0x00E5FF, transparent: true, opacity: 0.15, blending: THREE.AdditiveBlending });
+    scene.add(new THREE.Mesh(coreGeo, coreMat));
+}
+
+function animate() {
+    requestAnimationFrame(animate);
+    time += 0.01;
+    if (mobiusMesh) {
+        mobiusMesh.rotation.z = time * 0.08;
+        mobiusMesh.material.uniforms.uTime.value = time * 100;
+    }
+    scene.children.forEach(c => { if (c.userData.isStarfield) c.rotation.y = time * 0.015; });
+    renderer.render(scene, camera);
+}
+
+// ═══════════════════════════════════════════════
+// UI RENDERING
+// ═══════════════════════════════════════════════
+
+function renderAvatars() {
+    const strip = document.getElementById('avatar-strip');
+    strip.innerHTML = AVATARS.map(a => `
+        <div class="avatar-slot ${a.id === speakingAvatar ? 'speaking' : ''}" onclick="focusAvatar('${a.id}')">
+            <div class="avatar-orb" style="--ac:${a.color}; background:${a.gradient}; border: 1.5px solid ${a.color};">
+                <div class="avatar-orb-inner">${kimiOrbital()}</div>
+                <div class="avatar-status-dot" style="background:${a.status==='active'?'#4CAF50':a.status==='processing'?'#FF9800':'#666'}"></div>
+            </div>
+            <div class="avatar-name">${a.name}</div>
+        </div>
+    `).join('');
+}
+
+function renderDock() {
+    const bar = document.getElementById('dock-bar');
+    bar.innerHTML = PANELS_CFG.map(p => `
+        <button class="dock-btn ${currentPanel===p.id?'active':''}" style="--panel-color:${p.color}; --ac:${p.color}" onclick="togglePanel('${p.id}')">
+            ${p.notif && currentPanel !== p.id ? '<div class="dock-notif"></div>' : ''}
+            <div class="dock-icon">${kimiMicro()}</div>
+            <div class="dock-label">${p.label}</div>
+            <div class="dock-indicator"></div>
+        </button>
+    `).join('');
+}
+
+function renderPanelContent(id) {
+    const cfg = PANELS_CFG.find(p => p.id === id);
+    let header = `<div class="panel-header"><div class="panel-title">${cfg.label}</div><button class="panel-close" onclick="closePanel()">✕</button></div>`;
+    let body = '';
+
+    switch(id) {
+        case 'avatars':
+            body = `<div class="avatars-grid">${AVATARS.map(a => `
+                <div class="avatar-card" onclick="focusAvatar('${a.id}')">
+                    <div class="avatar-card-orb" style="--ac:${a.color}; background:${a.gradient}; border:1.5px solid ${a.color}">${kimiOrbital()}</div>
+                    <div class="avatar-card-name" style="color:${a.color}">${a.name}</div>
+                    <div class="avatar-card-role">${a.model}</div>
+                    <div class="avatar-card-status" style="color:${a.status==='active'?'var(--green)':a.status==='processing'?'var(--amber)':'var(--gray-text)'}">${a.status}</div>
+                </div>
+            `).join('')}</div>`;
+            break;
+        case 'comm':
+            body = `
+                <div class="routing-row">
+                    ${['All', 'Product', 'Finance', 'Marketing', 'Management', 'Human→AI', 'AI→AI', 'Broadcast'].map((r,i) =>
+                        `<button class="route-chip ${i===0?'active':''}">${r}</button>`
+                    ).join('')}
+                </div>
+                <div class="panel-body">
+                    ${MESSAGES.map(m => `
+                        <div class="comm-msg">
+                            <div class="comm-route">${m.from}<span class="arr"> → </span>${m.to}</div>
+                            <div class="comm-body">
+                                <div class="comm-topic">${m.text}</div>
+                            </div>
+                            <div class="comm-time">${m.time}</div>
+                        </div>
+                    `).join('')}
+                </div>
+                <div class="comm-input-row">
+                    <input class="comm-input" placeholder="Маршрутизировать сообщение…" />
+                    <button class="comm-send">Send</button>
+                </div>
+            `;
+            break;
+        case 'code':
+            body = `
+                <div class="terminal-tabs">
+                    <button class="terminal-tab active">Claude Code</button>
+                    <button class="terminal-tab">ChatGPT</button>
+                    <button class="terminal-tab">Kimi</button>
+                    <button class="terminal-tab">Qwen</button>
+                </div>
+                <div class="terminal-output">
+                    <div class="term-green">$ analyzing business_model.py</div>
+                    <div class="term-gray" style="margin-top:8px">Loading hypothesis validation...</div>
+                    <div class="term-blue" style="margin-top:4px">→ LTV:CAC ratio: 8.3 ✓</div>
+                    <div class="term-blue">→ Churn rate: 12% ✓</div>
+                    <div class="term-yellow" style="margin-top:8px">⚠ Warning: Enterprise segment underexplored</div>
+                    <div class="term-cyan" style="margin-top:8px">→ Running competitive analysis module...</div>
+                    <div class="term-gray" style="margin-top:8px"><span class="term-cursor">▌</span></div>
+                </div>
+            `;
+            break;
+        case 'input':
+            body = `
+                <textarea class="input-area" placeholder="Введите команду, вопрос или направление для обсуждения…"></textarea>
+                <div class="input-controls">
+                    <button class="input-mode-btn" onclick="this.classList.toggle('recording')" title="Voice">🎤</button>
+                    <button class="input-mode-btn" title="Camera">📷</button>
+                    <button class="input-mode-btn" title="Gesture">✋</button>
+                    <button class="input-send-btn">➤ Send to Product</button>
+                </div>
+            `;
+            break;
+        case 'notes':
+            body = `
+                <div style="font-size:12px;color:var(--gray-text);letter-spacing:1px;margin-bottom:12px;">MANUAL TRANSMISSION</div>
+                <textarea class="input-area" placeholder="Введите команду, вопрос или направление для обсуждения…"></textarea>
+                <div class="input-controls">
+                    <button class="input-mode-btn" onclick="this.classList.toggle('recording')" title="Voice">🎤</button>
+                    <button class="input-mode-btn" title="Camera">📷</button>
+                    <button class="input-mode-btn" title="Gesture">✋</button>
+                    <button class="input-send-btn">➤ Send to Product</button>
+                </div>
+            `;
+            break;
+    }
+
+    document.getElementById('panel-content').innerHTML = header + '<div class="panel-body">' + body + '</div>';
+}
+
+function showNotesView(view, btn) {
+    document.querySelectorAll('.notes-tab').forEach(t => t.classList.remove('active'));
+    btn.classList.add('active');
+    const body = document.getElementById('notes-body');
+    if (view === 'journal') {
+        body.innerHTML = NOTES.map(n => `<div class="note-entry"><div class="note-time">${n.time}</div><div class="note-text">${n.text}</div></div>`).join('');
+    } else if (view === 'docs') {
+        body.innerHTML = `<div class="doc-grid">${['Business Model Canvas','Hypothesis Log','Run Config','Debrief Notes'].map(d => `<div class="doc-card"><div class="doc-card-icon">📄</div><div class="doc-card-name">${d}</div></div>`).join('')}</div>`;
+    } else {
+        body.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:200px;color:var(--gray-text);font-size:13px;">📷 Camera feed — visual context for AI agents</div>';
+    }
+}
+
+// ═══════════════════════════════════════════════
+// PANEL LOGIC
+// ═══════════════════════════════════════════════
+
+function togglePanel(id) {
+    if (currentPanel === id) {
+        closePanel();
+    } else {
+        openPanel(id);
+    }
+}
+
+function openPanel(id) {
+    currentPanel = id;
+    const panel = document.getElementById('slide-panel');
+    const backdrop = document.getElementById('panel-backdrop');
+    const cfg = PANELS_CFG.find(p => p.id === id);
+
+    renderPanelContent(id);
+    renderDock();
+
+    // Update panel border color
+    panel.style.borderColor = cfg.color + '30';
+
+    backdrop.classList.add('visible');
+    requestAnimationFrame(() => panel.classList.add('visible'));
+}
+
+function closePanel() {
+    const panel = document.getElementById('slide-panel');
+    const backdrop = document.getElementById('panel-backdrop');
+    panel.classList.remove('visible');
+    backdrop.classList.remove('visible');
+    setTimeout(() => {
+        currentPanel = null;
+        renderDock();
+    }, 350);
+}
+
+function focusAvatar(id) {
+    speakingAvatar = id;
+    renderAvatars();
+    if (currentPanel !== 'avatars') openPanel('avatars');
+}
+
+// setVariant removed — анимация всегда slide
+
+// ═══════════════════════════════════════════════
+// CLOCK & INIT
+// ═══════════════════════════════════════════════
+
+function updateClock() {
+    const now = new Date();
+    document.getElementById('clock').textContent = now.toLocaleTimeString('ru-RU', { hour:'2-digit', minute:'2-digit', second:'2-digit' });
+}
+
+// ESC to close
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && currentPanel) closePanel(); });
+
+// Loader
+let progress = 0;
+const loadInterval = setInterval(() => {
+    progress += Math.random() * 25 + 10;
+    if (progress > 100) progress = 100;
+    document.getElementById('loader-fill').style.width = progress + '%';
+    if (progress >= 100) {
+        clearInterval(loadInterval);
+        setTimeout(() => document.getElementById('loader').classList.add('hidden'), 400);
+    }
+}, 180);
+
+// Init
+renderAvatars();
+renderDock();
+updateClock();
+setInterval(updateClock, 1000);
+initThree();
+</script>
+
+<!-- AI³ Navigator Widget -->
+<div id="nav-widget" style="
+    position: fixed;
+    top: 70px;
+    left: 24px;
+    width: 120px;
+    height: 120px;
+    z-index: 9999;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 0 20px rgba(0,229,255,0.15);
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+" onmouseenter="this.style.transform='scale(1.08)';this.style.boxShadow='0 0 30px rgba(0,229,255,0.3)'" onmouseleave="this.style.transform='scale(1)';this.style.boxShadow='0 0 20px rgba(0,229,255,0.15)'">
+    <iframe src="../navigator-widget/wb-navigator-widget.html" 
+        style="width:600px;height:600px;border:none;transform:scale(0.2);transform-origin:top left;pointer-events:none;"
+    ></iframe>
+    <div onclick="window.location.href='../navigator-inner/wb-navigator-inner.html'" 
+        style="position:absolute;top:0;left:0;right:0;bottom:0;z-index:1;cursor:pointer;">
+    </div>
+</div>
+<!-- /AI3 Navigator Widget -->
+
+<!-- Fullscreen toggle -->
+<button class="fs-btn" id="fsBtn" title="Fullscreen">
+<svg viewBox="0 0 24 24"><path d="M8 3H5a2 2 0 00-2 2v3m18 0V5a2 2 0 00-2-2h-3m0 18h3a2 2 0 002-2v-3M3 16v3a2 2 0 002 2h3"/></svg>
+</button>
+<script>
+(function(){
+  var btn=document.getElementById("fsBtn");
+  var expand='<path d="M8 3H5a2 2 0 00-2 2v3m18 0V5a2 2 0 00-2-2h-3m0 18h3a2 2 0 002-2v-3M3 16v3a2 2 0 002 2h3"/>';
+  var shrink='<path d="M4 14h3a2 2 0 012 2v3m2-16v3a2 2 0 01-2 2H4m16 2h-3a2 2 0 01-2-2V4m2 16v-3a2 2 0 012-2h3"/>';
+  function upd(){var f=document.fullscreenElement||document.webkitFullscreenElement;btn.querySelector("svg").innerHTML=f?shrink:expand}
+  btn.onclick=function(){var f=document.fullscreenElement||document.webkitFullscreenElement;if(f){(document.exitFullscreen||document.webkitExitFullscreen).call(document)}else{var e=document.documentElement;(e.requestFullscreen||e.webkitRequestFullscreen).call(e)}};
+  document.addEventListener("fullscreenchange",upd);document.addEventListener("webkitfullscreenchange",upd);
+})();
+</script>
+</body>
+</html>
