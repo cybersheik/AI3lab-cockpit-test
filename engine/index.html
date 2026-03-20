@@ -1217,9 +1217,13 @@ initThree();
   var btn=document.getElementById("fsBtn");
   var expand='<path d="M8 3H5a2 2 0 00-2 2v3m18 0V5a2 2 0 00-2-2h-3m0 18h3a2 2 0 002-2v-3M3 16v3a2 2 0 002 2h3"/>';
   var shrink='<path d="M4 14h3a2 2 0 012 2v3m2-16v3a2 2 0 01-2 2H4m16 2h-3a2 2 0 01-2-2V4m2 16v-3a2 2 0 012-2h3"/>';
-  function upd(){var f=document.fullscreenElement||document.webkitFullscreenElement;btn.querySelector("svg").innerHTML=f?shrink:expand}
-  btn.onclick=function(){var f=document.fullscreenElement||document.webkitFullscreenElement;if(f){(document.exitFullscreen||document.webkitExitFullscreen).call(document)}else{var e=document.documentElement;(e.requestFullscreen||e.webkitRequestFullscreen).call(e)}};
+  function isFS(){return !!(document.fullscreenElement||document.webkitFullscreenElement)}
+  function goFS(){var e=document.documentElement;(e.requestFullscreen||e.webkitRequestFullscreen).call(e)}
+  function exitFS(){(document.exitFullscreen||document.webkitExitFullscreen).call(document)}
+  function upd(){btn.querySelector("svg").innerHTML=isFS()?shrink:expand;if(isFS()){localStorage.setItem('ai3fs','1')}else{localStorage.removeItem('ai3fs')}}
+  btn.onclick=function(){if(isFS()){exitFS()}else{goFS()}};
   document.addEventListener("fullscreenchange",upd);document.addEventListener("webkitfullscreenchange",upd);
+  if(localStorage.getItem('ai3fs')){document.addEventListener("click",function once(){goFS();document.removeEventListener("click",once)},{once:true})}
 })();
 </script>
 </body>
