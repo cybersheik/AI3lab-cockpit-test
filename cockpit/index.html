@@ -42,6 +42,20 @@
   </head>
   <body>
     <div id="root"></div>
+
+    <!-- AI³ Navigator Widget -->
+    <div id="nav-widget" style="
+        position: fixed; top: 70px; left: 24px; width: 120px; height: 120px;
+        z-index: 9999; border-radius: 12px; overflow: hidden;
+        box-shadow: 0 0 20px rgba(0,229,255,0.15);
+        transition: transform 0.3s ease, box-shadow 0.3s ease;
+    " onmouseenter="this.style.transform='scale(1.08)';this.style.boxShadow='0 0 30px rgba(0,229,255,0.3)'" onmouseleave="this.style.transform='scale(1)';this.style.boxShadow='0 0 20px rgba(0,229,255,0.15)'">
+        <iframe src="../navigator-widget/index.html"
+            style="width:600px;height:600px;border:none;transform:scale(0.2);transform-origin:top left;"
+        ></iframe>
+    </div>
+    <!-- /AI³ Navigator Widget -->
+
     <!-- Portal navigation listener (from nav-widget iframe) -->
     <script>
     window.addEventListener('message', function(e) {
