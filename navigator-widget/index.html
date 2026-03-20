@@ -82,7 +82,7 @@
     // ── PORTAL CLICK STATE ──
     let portalActive = false;
     let portalProgress = 0;
-    let portalTargetUrl = null; // set this to navigation page URL
+    let portalTargetUrl = '../navigator-inner/index.html';
 
     // ── RENDERER ──
     const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
@@ -354,7 +354,12 @@
             coreGlowMat.opacity = 0.15 + eased * 0.85;
 
             if (p >= 1.0 && portalTargetUrl) {
-                window.location.href = portalTargetUrl;
+                // If inside iframe — postMessage to parent for navigation
+                if (window !== window.top) {
+                    window.parent.postMessage({ type: 'portal-navigate', url: portalTargetUrl }, '*');
+                } else {
+                    window.location.href = portalTargetUrl;
+                }
             }
         }
 

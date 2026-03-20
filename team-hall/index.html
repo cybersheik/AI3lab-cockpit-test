@@ -1146,5 +1146,13 @@ initScene();
   document.addEventListener("fullscreenchange",upd);document.addEventListener("webkitfullscreenchange",upd);
 })();
 </script>
+<!-- Portal navigation listener (from nav-widget iframe) -->
+<script>
+window.addEventListener('message', function(e) {
+    if (e.data && e.data.type === 'portal-navigate' && e.data.url) {
+        window.location.href = e.data.url;
+    }
+});
+</script>
 </body>
 </html>
