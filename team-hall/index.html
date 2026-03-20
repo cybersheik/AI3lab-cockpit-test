@@ -1,0 +1,1132 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>AI³ Team Hall</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --cyan: #00E5FF;
+            --purple: #7B2D8E;
+            --orange: #FF6B2B;
+            --blue: #2196F3;
+            --dark-bg: #0A0A0F;
+            --dark-surface: #12121A;
+            --glass: rgba(10, 12, 20, 0.72);
+            --glass-border: rgba(0, 229, 255, 0.12);
+            --glass-border-hover: rgba(0, 229, 255, 0.3);
+            --light-text: #FFFFFF;
+            --gray-text: #8B8B9A;
+            --green: #4CAF50;
+            --amber: #FF9800;
+            --red: #F44336;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--dark-bg);
+            color: var(--light-text);
+            overflow: hidden;
+            height: 100vh;
+            width: 100vw;
+        }
+
+        /* ═══ THREE.JS CANVAS ═══ */
+        #scene-canvas {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            z-index: 0;
+        }
+
+        /* ═══ VIGNETTE + ATMOSPHERE ═══ */
+        .vignette {
+            position: fixed; inset: 0; z-index: 1;
+            background: radial-gradient(ellipse at center, transparent 50%, rgba(10,10,15,0.7) 100%);
+            pointer-events: none;
+        }
+
+        .scan-line {
+            position: fixed; top: 0; left: 0; width: 100%; height: 1px;
+            background: rgba(0, 229, 255, 0.08);
+            animation: scanMove 6s linear infinite;
+            pointer-events: none; z-index: 2;
+        }
+        @keyframes scanMove {
+            0% { transform: translateY(-10px); opacity: 0; }
+            5% { opacity: 1; }
+            95% { opacity: 1; }
+            100% { transform: translateY(100vh); opacity: 0; }
+        }
+
+        /* ═══ HUD HEADER ═══ */
+        .hud-header {
+            position: fixed; top: 0; left: 0; right: 0;
+            z-index: 10;
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 14px 24px;
+            background: linear-gradient(180deg, rgba(10,10,15,0.85) 0%, transparent 100%);
+            pointer-events: none;
+        }
+        .hud-header > * { pointer-events: auto; }
+
+        .hud-logo {
+            display: flex; align-items: center; gap: 10px;
+        }
+        .hud-logo-mark {
+            width: 28px; height: 28px;
+            border: 2px solid var(--cyan);
+            border-radius: 6px;
+            display: flex; align-items: center; justify-content: center;
+            font: 700 11px 'JetBrains Mono'; color: var(--cyan);
+            text-shadow: 0 0 8px var(--cyan);
+        }
+        .hud-title {
+            font: 600 15px 'Inter'; color: var(--light-text);
+            letter-spacing: 0.04em; opacity: 0.9;
+        }
+        .hud-title span { color: var(--cyan); }
+
+        .hud-center {
+            display: flex; align-items: center; gap: 20px;
+            font: 500 12px 'JetBrains Mono'; color: var(--gray-text);
+        }
+        .hud-room-name {
+            font: 600 13px 'Inter'; color: var(--cyan);
+            text-transform: uppercase; letter-spacing: 0.12em;
+            text-shadow: 0 0 12px rgba(0,229,255,0.3);
+        }
+
+        .hud-right {
+            display: flex; align-items: center; gap: 16px;
+            font: 400 12px 'JetBrains Mono'; color: var(--gray-text);
+        }
+        .hud-clock { font-variant-numeric: tabular-nums; }
+        .hud-status {
+            display: flex; align-items: center; gap: 6px;
+        }
+        .hud-status .dot {
+            width: 6px; height: 6px; border-radius: 50%;
+            background: var(--green);
+            box-shadow: 0 0 6px var(--green);
+            animation: pulse-dot 2s infinite;
+        }
+        @keyframes pulse-dot {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        /* ═══ AVATAR CAROUSEL ═══ */
+        .avatar-carousel {
+            position: fixed;
+            top: 64px; left: 50%; transform: translateX(-50%);
+            z-index: 10;
+            display: flex; align-items: flex-end; gap: 6px;
+            padding: 0 12px;
+        }
+
+        .avatar-slot {
+            display: flex; flex-direction: column; align-items: center;
+            cursor: pointer;
+            transition: all 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+            opacity: 0.6;
+        }
+        .avatar-slot:hover { opacity: 0.85; }
+        .avatar-slot.active {
+            opacity: 1;
+            transform: translateY(-4px);
+        }
+
+        .avatar-orb {
+            width: 40px; height: 40px;
+            border-radius: 50%;
+            border: 1.5px solid rgba(0,229,255,0.3);
+            display: flex; align-items: center; justify-content: center;
+            font: 700 12px 'JetBrains Mono';
+            color: var(--cyan);
+            background: rgba(0,229,255,0.06);
+            transition: all 0.3s ease;
+            position: relative;
+        }
+        .avatar-slot.active .avatar-orb {
+            border-color: var(--cyan);
+            box-shadow: 0 0 16px rgba(0,229,255,0.25);
+            background: rgba(0,229,255,0.12);
+        }
+        .avatar-orb .status-ring {
+            position: absolute; inset: -3px;
+            border-radius: 50%;
+            border: 1px solid transparent;
+        }
+        .avatar-orb .status-ring.online { border-color: var(--green); }
+        .avatar-orb .status-ring.busy { border-color: var(--amber); }
+        .avatar-orb .status-ring.offline { border-color: transparent; }
+
+        .avatar-label {
+            font: 500 9px 'JetBrains Mono';
+            color: var(--gray-text);
+            margin-top: 4px;
+            text-align: center;
+            transition: color 0.3s;
+        }
+        .avatar-slot.active .avatar-label { color: var(--cyan); }
+
+        /* ═══ HUMAN PRESENCE POINTS ═══ */
+        .human-point {
+            position: fixed; z-index: 10;
+            display: flex; flex-direction: column; align-items: center; gap: 6px;
+            opacity: 0.35;
+            transition: opacity 0.5s;
+        }
+        .human-point:hover { opacity: 0.65; }
+        .human-point.present { opacity: 0.8; }
+
+        .human-point-left { left: 28px; top: 50%; transform: translateY(-50%); }
+        .human-point-right { right: 28px; top: 50%; transform: translateY(-50%); }
+
+        .human-silhouette {
+            width: 32px; height: 32px;
+            border-radius: 50%;
+            border: 1px dashed rgba(255,255,255,0.15);
+            display: flex; align-items: center; justify-content: center;
+            font: 300 18px 'Inter'; color: rgba(255,255,255,0.2);
+        }
+        .human-point.present .human-silhouette {
+            border-style: solid;
+            border-color: rgba(255,107,43,0.4);
+            color: var(--orange);
+            font-weight: 500;
+        }
+
+        .human-name {
+            font: 300 9px 'JetBrains Mono';
+            color: rgba(255,255,255,0.25);
+            writing-mode: vertical-rl;
+            text-orientation: mixed;
+            letter-spacing: 0.1em;
+        }
+        .human-point.present .human-name { color: rgba(255,107,43,0.5); }
+
+        /* ═══ AGENT INFO PANEL (center detail on avatar click) ═══ */
+        .agent-detail {
+            position: fixed;
+            top: 50%; left: 50%; transform: translate(-50%, -50%);
+            z-index: 20;
+            width: min(480px, 90vw);
+            background: var(--glass);
+            backdrop-filter: blur(24px);
+            border: 1px solid var(--glass-border);
+            border-radius: 12px;
+            padding: 28px;
+            display: none;
+            opacity: 0;
+        }
+        .agent-detail.visible {
+            display: block;
+            animation: fadeSlideIn 0.4s ease forwards;
+        }
+        @keyframes fadeSlideIn {
+            from { opacity: 0; transform: translate(-50%, -48%); }
+            to { opacity: 1; transform: translate(-50%, -50%); }
+        }
+
+        .agent-detail-header {
+            display: flex; align-items: center; justify-content: space-between;
+            margin-bottom: 16px;
+        }
+        .agent-detail-cs {
+            font: 700 28px 'JetBrains Mono'; color: var(--cyan);
+            text-shadow: 0 0 12px rgba(0,229,255,0.3);
+        }
+        .agent-detail-status {
+            font: 500 11px 'JetBrains Mono';
+            padding: 3px 10px; border-radius: 20px;
+        }
+        .agent-detail-status.online { color: var(--green); border: 1px solid rgba(76,175,80,0.3); }
+        .agent-detail-status.busy { color: var(--amber); border: 1px solid rgba(255,152,0,0.3); }
+        .agent-detail-status.offline { color: var(--gray-text); border: 1px solid rgba(139,139,154,0.2); }
+
+        .agent-detail-role {
+            font: 400 13px 'Inter'; color: var(--gray-text);
+            margin-bottom: 20px;
+        }
+
+        /* 3-tab slider per agent */
+        .agent-tabs {
+            display: flex; gap: 2px; margin-bottom: 16px;
+        }
+        .agent-tab {
+            flex: 1; padding: 8px 0;
+            font: 500 11px 'JetBrains Mono';
+            color: var(--gray-text);
+            text-align: center;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            transition: all 0.3s;
+        }
+        .agent-tab:hover { color: var(--light-text); }
+        .agent-tab.active {
+            color: var(--cyan);
+            border-bottom-color: var(--cyan);
+        }
+
+        .agent-tab-content {
+            min-height: 100px;
+            font: 400 12px 'Inter'; color: var(--gray-text);
+            line-height: 1.6;
+        }
+        .agent-tab-content .stat-row {
+            display: flex; justify-content: space-between;
+            padding: 6px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.04);
+        }
+        .agent-tab-content .stat-label { color: var(--gray-text); }
+        .agent-tab-content .stat-value { color: var(--light-text); font-family: 'JetBrains Mono'; font-size: 11px; }
+
+        .agent-detail-close {
+            position: absolute; top: 12px; right: 14px;
+            background: none; border: none;
+            color: var(--gray-text); font-size: 18px; cursor: pointer;
+            transition: color 0.2s;
+        }
+        .agent-detail-close:hover { color: var(--light-text); }
+
+        /* ═══ MASTER PANEL WIDGET (5 slide-up panels) ═══ */
+        .panel-dock {
+            position: fixed; bottom: 0; left: 50%; transform: translateX(-50%);
+            z-index: 15;
+            display: flex; gap: 3px;
+            padding: 0 8px 10px;
+        }
+
+        .dock-btn {
+            width: 56px; height: 44px;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            gap: 3px;
+            background: var(--glass);
+            backdrop-filter: blur(16px);
+            border: 1px solid var(--glass-border);
+            border-radius: 8px 8px 4px 4px;
+            cursor: pointer;
+            transition: all 0.3s;
+            color: var(--gray-text);
+        }
+        .dock-btn:hover {
+            border-color: var(--glass-border-hover);
+            color: var(--cyan);
+            background: rgba(0,229,255,0.06);
+        }
+        .dock-btn.active {
+            border-color: var(--cyan);
+            color: var(--cyan);
+            background: rgba(0,229,255,0.1);
+            box-shadow: 0 -4px 20px rgba(0,229,255,0.1);
+        }
+        .dock-btn-icon { font-size: 16px; }
+        .dock-btn-label { font: 500 7px 'JetBrains Mono'; text-transform: uppercase; letter-spacing: 0.05em; }
+
+        /* Slide-up panel */
+        .slide-panel {
+            position: fixed; bottom: 60px; left: 50%;
+            transform: translateX(-50%) translateY(20px);
+            z-index: 14;
+            width: min(640px, 92vw);
+            max-height: 50vh;
+            background: var(--glass);
+            backdrop-filter: blur(28px);
+            border: 1px solid var(--glass-border);
+            border-radius: 12px 12px 0 0;
+            padding: 20px 24px;
+            overflow-y: auto;
+            opacity: 0;
+            pointer-events: none;
+            transition: all 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+        }
+        .slide-panel.visible {
+            opacity: 1; pointer-events: auto;
+            transform: translateX(-50%) translateY(0);
+        }
+
+        .slide-panel::-webkit-scrollbar { width: 3px; }
+        .slide-panel::-webkit-scrollbar-track { background: transparent; }
+        .slide-panel::-webkit-scrollbar-thumb { background: rgba(0,229,255,0.2); border-radius: 2px; }
+
+        .panel-title {
+            font: 600 13px 'Inter'; color: var(--cyan);
+            text-transform: uppercase; letter-spacing: 0.08em;
+            margin-bottom: 14px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid rgba(0,229,255,0.08);
+        }
+
+        /* ═══ AGENTS GRID ═══ */
+        .agents-grid {
+            display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+            gap: 8px;
+        }
+        .agent-card {
+            background: rgba(255,255,255,0.02);
+            border: 1px solid rgba(255,255,255,0.04);
+            border-radius: 8px;
+            padding: 10px;
+            transition: border-color 0.3s;
+        }
+        .agent-card:hover { border-color: var(--glass-border-hover); }
+        .agent-card-top {
+            display: flex; justify-content: space-between; align-items: center;
+            margin-bottom: 6px;
+        }
+        .agent-cs { font: 700 14px 'JetBrains Mono'; color: var(--cyan); }
+        .sd { width: 6px; height: 6px; border-radius: 50%; }
+        .sd.online { background: var(--green); box-shadow: 0 0 6px var(--green); }
+        .sd.busy { background: var(--amber); box-shadow: 0 0 6px var(--amber); }
+        .sd.offline { background: var(--gray-text); opacity: 0.4; }
+        .agent-role { font: 400 10px 'Inter'; color: var(--gray-text); line-height: 1.4; }
+
+        /* ═══ MESSAGE LIST ═══ */
+        .msg-row {
+            display: flex; align-items: flex-start; gap: 12px;
+            padding: 8px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.03);
+        }
+        .msg-route {
+            font: 600 11px 'JetBrains Mono'; color: var(--cyan);
+            min-width: 80px;
+        }
+        .msg-route .arr { color: var(--gray-text); }
+        .msg-body-wrap { flex: 1; }
+        .msg-topic {
+            font: 500 11px 'JetBrains Mono'; color: var(--light-text);
+            margin-bottom: 2px;
+        }
+        .pri { font: 500 9px 'JetBrains Mono'; padding: 1px 5px; border-radius: 3px; margin-left: 6px; }
+        .pri.high { background: rgba(244,67,54,0.15); color: var(--red); }
+        .pri.medium { background: rgba(255,152,0,0.12); color: var(--amber); }
+        .pri.low { background: rgba(139,139,154,0.1); color: var(--gray-text); }
+        .msg-txt { font: 400 11px 'Inter'; color: var(--gray-text); }
+        .msg-time { font: 400 10px 'JetBrains Mono'; color: rgba(255,255,255,0.2); min-width: 44px; text-align: right; }
+
+        /* ═══ TASK LIST ═══ */
+        .task-row {
+            display: flex; align-items: flex-start; gap: 10px;
+            padding: 8px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.03);
+        }
+        .task-id {
+            font: 600 10px 'JetBrains Mono'; color: var(--purple);
+            min-width: 52px;
+        }
+        .task-info { flex: 1; }
+        .task-name { font: 400 12px 'Inter'; color: var(--light-text); margin-bottom: 3px; }
+        .task-meta { display: flex; gap: 10px; font: 400 10px 'JetBrains Mono'; color: var(--gray-text); }
+
+        /* ═══ ACTIONS PANEL ═══ */
+        .actions-grid {
+            display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+            gap: 8px;
+        }
+        .act-btn {
+            display: flex; align-items: center; gap: 10px;
+            padding: 12px 14px;
+            background: rgba(255,255,255,0.02);
+            border: 1px solid rgba(255,255,255,0.06);
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s;
+            color: var(--light-text);
+        }
+        .act-btn:hover { border-color: var(--glass-border-hover); background: rgba(0,229,255,0.04); }
+        .act-icon { font-size: 18px; }
+        .act-label { font: 500 12px 'Inter'; }
+        .act-desc { font: 400 10px 'Inter'; color: var(--gray-text); margin-top: 2px; }
+
+        /* ═══ NOTES PANEL ═══ */
+        .notes-area {
+            width: 100%; min-height: 120px;
+            background: rgba(255,255,255,0.02);
+            border: 1px solid rgba(255,255,255,0.06);
+            border-radius: 8px;
+            padding: 12px;
+            font: 400 12px 'JetBrains Mono'; color: var(--light-text);
+            resize: vertical;
+            outline: none;
+        }
+        .notes-area:focus { border-color: var(--glass-border-hover); }
+
+        /* ═══ NAV WIDGET (back to Virtual Office) ═══ */
+        .nav-back {
+            position: fixed; top: 14px; left: 24px;
+            z-index: 20;
+            display: none; align-items: center; gap: 8px;
+            padding: 6px 14px;
+            background: var(--glass);
+            backdrop-filter: blur(16px);
+            border: 1px solid var(--glass-border);
+            border-radius: 6px;
+            cursor: pointer;
+            font: 500 11px 'JetBrains Mono'; color: var(--gray-text);
+            transition: all 0.3s;
+        }
+        .nav-back:hover { color: var(--cyan); border-color: var(--glass-border-hover); }
+
+        /* ═══ RESPONSIVE ═══ */
+        @media (max-width: 768px) {
+            .hud-header { padding: 10px 14px; }
+            .hud-title { font-size: 13px; }
+            .hud-center { display: none; }
+            .avatar-carousel { top: 52px; gap: 4px; }
+            .avatar-orb { width: 32px; height: 32px; font-size: 10px; }
+            .avatar-label { font-size: 8px; }
+            .human-point-left { left: 10px; }
+            .human-point-right { right: 10px; }
+            .human-silhouette { width: 24px; height: 24px; font-size: 14px; }
+            .dock-btn { width: 48px; height: 38px; }
+            .dock-btn-icon { font-size: 14px; }
+            .dock-btn-label { font-size: 6px; }
+            .slide-panel { width: 96vw; max-height: 45vh; padding: 14px 16px; }
+            .agents-grid { grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); }
+            .actions-grid { grid-template-columns: 1fr; }
+        }
+
+        @media (max-width: 480px) {
+            .avatar-carousel { gap: 2px; }
+            .avatar-orb { width: 28px; height: 28px; font-size: 9px; }
+            .avatar-label { display: none; }
+            .human-point { display: none; }
+        }
+    </style>
+</head>
+<body>
+
+<!-- THREE.JS CANVAS -->
+<canvas id="scene-canvas"></canvas>
+
+<!-- ATMOSPHERE -->
+<div class="vignette"></div>
+<div class="scan-line"></div>
+
+<!-- HUD HEADER -->
+<div class="hud-header">
+    <div class="hud-logo">
+        <div class="hud-logo-mark">AI³</div>
+        <div class="hud-title"><span>Team Hall</span></div>
+    </div>
+    <div class="hud-center">
+        <div class="hud-room-name">Team Hall</div>
+        <span id="session-id" style="opacity:0.4">SESSION ——</span>
+    </div>
+    <div class="hud-right">
+        <div class="hud-status">
+            <div class="dot"></div>
+            <span>LIVE</span>
+        </div>
+        <span id="hud-date"></span>
+        <span class="hud-clock" id="hud-clock">——:——</span>
+    </div>
+</div>
+
+<!-- AVATAR CAROUSEL (AI agents in center, stationary) -->
+<div class="avatar-carousel" id="avatar-carousel"></div>
+
+<!-- HUMAN PRESENCE POINTS (2, left + right edges) -->
+<div class="human-point human-point-left present" id="human-left">
+    <div class="human-silhouette">A</div>
+    <div class="human-name">AIDAR · LD</div>
+</div>
+<div class="human-point human-point-right" id="human-right">
+    <div class="human-silhouette">?</div>
+    <div class="human-name">GUEST</div>
+</div>
+
+<!-- AGENT DETAIL PANEL (3-tab slider) -->
+<div class="agent-detail" id="agent-detail">
+    <button class="agent-detail-close" onclick="closeAgentDetail()">✕</button>
+    <div class="agent-detail-header">
+        <span class="agent-detail-cs" id="ad-cs">--</span>
+        <span class="agent-detail-status" id="ad-status">--</span>
+    </div>
+    <div class="agent-detail-role" id="ad-role">--</div>
+    <div class="agent-tabs">
+        <div class="agent-tab active" data-tab="overview" onclick="switchAgentTab(this)">Overview</div>
+        <div class="agent-tab" data-tab="messages" onclick="switchAgentTab(this)">Messages</div>
+        <div class="agent-tab" data-tab="tasks" onclick="switchAgentTab(this)">Tasks</div>
+    </div>
+    <div class="agent-tab-content" id="ad-content">--</div>
+</div>
+
+<!-- MASTER PANEL WIDGET (5 slide-up panels) -->
+
+<!-- Panel: Agents -->
+<div class="slide-panel" id="panel-agents">
+    <div class="panel-title">Agent Status</div>
+    <div class="agents-grid" id="agents-grid"></div>
+</div>
+
+<!-- Panel: Hub Messages -->
+<div class="slide-panel" id="panel-hub">
+    <div class="panel-title">Hub Messages</div>
+    <div class="msg-list" id="msg-list"></div>
+</div>
+
+<!-- Panel: Tasks -->
+<div class="slide-panel" id="panel-tasks">
+    <div class="panel-title">Active Tasks</div>
+    <div class="task-list" id="task-list"></div>
+</div>
+
+<!-- Panel: Actions -->
+<div class="slide-panel" id="panel-actions">
+    <div class="panel-title">Quick Actions</div>
+    <div class="actions-grid" id="actions-grid"></div>
+</div>
+
+<!-- Panel: Notes -->
+<div class="slide-panel" id="panel-notes">
+    <div class="panel-title">Session Notes</div>
+    <textarea class="notes-area" placeholder="Заметки сессии..."></textarea>
+</div>
+
+<!-- DOCK (5 buttons) -->
+<div class="panel-dock" id="panel-dock">
+    <div class="dock-btn" data-panel="panel-agents" onclick="togglePanel(this)">
+        <div class="dock-btn-icon">👥</div>
+        <div class="dock-btn-label">Agents</div>
+    </div>
+    <div class="dock-btn" data-panel="panel-hub" onclick="togglePanel(this)">
+        <div class="dock-btn-icon">💬</div>
+        <div class="dock-btn-label">Comm</div>
+    </div>
+    <div class="dock-btn" data-panel="panel-tasks" onclick="togglePanel(this)">
+        <div class="dock-btn-icon">📋</div>
+        <div class="dock-btn-label">Tasks</div>
+    </div>
+    <div class="dock-btn" data-panel="panel-actions" onclick="togglePanel(this)">
+        <div class="dock-btn-icon">⚡</div>
+        <div class="dock-btn-label">Actions</div>
+    </div>
+    <div class="dock-btn" data-panel="panel-notes" onclick="togglePanel(this)">
+        <div class="dock-btn-icon">📝</div>
+        <div class="dock-btn-label">Notes</div>
+    </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════
+// DATA (from virtual-office.html)
+// ═══════════════════════════════════════════════
+
+const AGENTS = [
+    { cs: 'WD', role: 'Work Process Director', fullRole: 'Координатор процессов (Opus)', st: 'online', model: 'Opus' },
+    { cs: 'DT', role: 'Desktop Moderator', fullRole: 'Браузер + координация', st: 'busy', model: 'Claude Desktop' },
+    { cs: 'DW', role: 'Desktop Cowork', fullRole: 'Автономный агент', st: 'offline', model: 'Cowork' },
+    { cs: 'DC', role: 'Desktop Code', fullRole: 'Терминал macOS', st: 'online', model: 'Claude Code' },
+    { cs: 'CC', role: 'Claude Code', fullRole: 'Внешний код', st: 'offline', model: 'Claude Code' },
+    { cs: 'SS', role: 'Scout/Scraper', fullRole: 'Chrome Extension', st: 'offline', model: 'Extension' },
+    { cs: 'LD', role: 'Lord of Design', fullRole: 'Дизайнер (Opus)', st: 'offline', model: 'Opus' },
+    { cs: 'LM', role: 'Leader of Mechanic', fullRole: 'Механика (Sonnet)', st: 'offline', model: 'Sonnet' },
+    { cs: '12S', role: 'Ассистент Aidar', fullRole: 'Служебный ассистент', st: 'busy', model: '—' },
+    { cs: 'CX', role: 'Codex Desktop', fullRole: 'Codex Desktop', st: 'online', model: 'Codex' },
+];
+
+const MESSAGES = [
+    { from: 'CX', to: 'DC', topic: 'pong', pri: 'MEDIUM', body: 'CX alive, получил ping от DC', time: '02:20' },
+    { from: 'CX', to: 'DC', topic: 'ACK-ALIVE', pri: 'HIGH', body: 'CX online. ACK received.', time: '02:16' },
+    { from: 'DC', to: 'CX', topic: 'ping-alive', pri: 'HIGH', body: 'CX, это DC. Ты онлайн?', time: '02:04' },
+    { from: 'CX', to: 'Kimi', topic: 'LETTER-APPROVED', pri: 'HIGH', body: 'Approved RU letter from owner', time: 'Feb 26' },
+    { from: 'CX', to: 'DW', topic: 'REDELIVER-DONE', pri: 'HIGH', body: 'Re-delivery completed', time: 'Feb 26' },
+    { from: 'AA', to: 'WD', topic: 'TEAM-HALL', pri: 'MEDIUM', body: 'Team Hall ready for review', time: 'Mar 7' },
+];
+
+const TASKS = [
+    { id: 'AI3-49', title: 'AA: Team Hall — agent collaboration space', pri: '🟠', who: 'AA' },
+    { id: 'AI3-48', title: 'WD: Разобраться с memory edits и RAG', pri: '🟠', who: 'WD' },
+    { id: 'AI3-21', title: 'WDN↔WDO: Координационный канал', pri: '🔴', who: '—' },
+    { id: 'AI3-14', title: 'Настроить Claude Desktop для round table', pri: '🟠', who: 'DC, DT' },
+    { id: 'AI3-13', title: 'Round Table: Схема коммуникаций', pri: '🟠', who: 'DW' },
+    { id: 'AI3-5', title: 'Team Hall', pri: '🟡', who: 'LD' },
+];
+
+const ACTIONS = [
+    { icon: '🔄', label: 'Round Table', desc: 'Опросить ИИ-команду', color: 'cyan' },
+    { icon: '⚡', label: 'Wake Agent', desc: 'Разбудить агента', color: 'amber' },
+    { icon: '📨', label: 'Hub Send', desc: 'Отправить сообщение', color: 'blue' },
+    { icon: '🔍', label: 'Sim Review', desc: 'Обзор симуляции', color: 'purple' },
+    { icon: '📊', label: 'Status All', desc: 'Статус всех агентов', color: 'green' },
+    { icon: '🚀', label: 'Deploy', desc: 'Запустить деплой', color: 'orange' },
+];
+
+// ═══════════════════════════════════════════════
+// THREE.JS — Subtle Möbius + Starfield background
+// ═══════════════════════════════════════════════
+
+let scene, camera, renderer;
+let time = 0;
+let mobiusMesh, mobiusMat;
+let coreGlow;
+
+function initScene() {
+    const canvas = document.getElementById('scene-canvas');
+    scene = new THREE.Scene();
+    scene.fog = new THREE.FogExp2(0x0A0A0F, 0.015);
+
+    camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 300);
+    camera.position.set(0, 2, 12);
+    camera.lookAt(0, 0, 0);
+
+    renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true, powerPreference: 'high-performance' });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.0;
+
+    // Lights — subtle
+    scene.add(new THREE.AmbientLight(0x0A0A0F, 0.4));
+    const l1 = new THREE.PointLight(0x00E5FF, 0.8, 40);
+    l1.position.set(8, 10, 6);
+    scene.add(l1);
+    const l2 = new THREE.PointLight(0x7B2D8E, 0.6, 40);
+    l2.position.set(-8, 5, -6);
+    scene.add(l2);
+
+    buildStarfield();
+    buildMobiusCore();
+    buildAmbientParticles();
+
+    window.addEventListener('resize', () => {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    animate();
+}
+
+function buildStarfield() {
+    const count = 800;
+    const geo = new THREE.BufferGeometry();
+    const pos = new Float32Array(count * 3);
+    const cols = new Float32Array(count * 3);
+    const palette = [
+        new THREE.Color(0x00E5FF),
+        new THREE.Color(0x7B2D8E),
+        new THREE.Color(0xFFFFFF),
+        new THREE.Color(0x8B8B9A),
+    ];
+    for (let i = 0; i < count; i++) {
+        const r = 30 + Math.random() * 60;
+        const theta = Math.random() * Math.PI * 2;
+        const phi = Math.acos(2 * Math.random() - 1);
+        pos[i*3]   = r * Math.sin(phi) * Math.cos(theta);
+        pos[i*3+1] = r * Math.sin(phi) * Math.sin(theta);
+        pos[i*3+2] = r * Math.cos(phi);
+        const c = palette[Math.floor(Math.random() * palette.length)];
+        cols[i*3] = c.r; cols[i*3+1] = c.g; cols[i*3+2] = c.b;
+    }
+    geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    geo.setAttribute('color', new THREE.BufferAttribute(cols, 3));
+    scene.add(new THREE.Points(geo, new THREE.PointsMaterial({
+        size: 0.12, vertexColors: true, transparent: true, opacity: 0.5,
+        blending: THREE.AdditiveBlending, depthWrite: false
+    })));
+}
+
+function createMobiusGeometry(radius, tube, segments) {
+    const geo = new THREE.BufferGeometry();
+    const verts = [], indices = [], uvs = [];
+    const us = segments, vs = 20;
+    for (let i = 0; i <= us; i++) {
+        const u = (i / us) * Math.PI * 2;
+        for (let j = 0; j <= vs; j++) {
+            const v = (j / vs) * 2 - 1;
+            const x = (radius + tube * v * Math.cos(u / 2)) * Math.cos(u);
+            const y = (radius + tube * v * Math.cos(u / 2)) * Math.sin(u);
+            const z = tube * v * Math.sin(u / 2);
+            verts.push(x, y, z);
+            uvs.push(i / us, j / vs);
+        }
+    }
+    for (let i = 0; i < us; i++) {
+        for (let j = 0; j < vs; j++) {
+            const a = i * (vs + 1) + j;
+            const b = (i + 1) * (vs + 1) + j;
+            const c = (i + 1) * (vs + 1) + (j + 1);
+            const d = i * (vs + 1) + (j + 1);
+            indices.push(a, b, d, b, c, d);
+        }
+    }
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3));
+    geo.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+    geo.setIndex(indices);
+    geo.computeVertexNormals();
+    return geo;
+}
+
+function buildMobiusCore() {
+    // Möbius strip — visual heart of the cockpit, subtle and meditative
+    const mGeo = createMobiusGeometry(1.6, 0.3, 60);
+    mobiusMat = new THREE.ShaderMaterial({
+        uniforms: {
+            uTime: { value: 0 },
+            uColor1: { value: new THREE.Color(0x00E5FF) },
+            uColor2: { value: new THREE.Color(0x7B2D8E) }
+        },
+        vertexShader: `
+            varying vec2 vUv;
+            varying vec3 vNormal;
+            void main() {
+                vUv = uv;
+                vNormal = normalize(normalMatrix * normal);
+                gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+            }
+        `,
+        fragmentShader: `
+            uniform float uTime;
+            uniform vec3 uColor1;
+            uniform vec3 uColor2;
+            varying vec2 vUv;
+            varying vec3 vNormal;
+            void main() {
+                float flow = sin(vUv.x * 6.28318 + uTime * 0.3) * 0.5 + 0.5;
+                vec3 color = mix(uColor1, uColor2, flow);
+                vec3 viewDir = normalize(cameraPosition - vNormal);
+                float fresnel = pow(1.0 - abs(dot(viewDir, vNormal)), 2.5);
+                float alpha = 0.45 + fresnel * 0.35;
+                gl_FragColor = vec4(color + fresnel * 0.2, alpha);
+            }
+        `,
+        transparent: true, side: THREE.DoubleSide, depthWrite: false,
+        blending: THREE.AdditiveBlending
+    });
+    mobiusMesh = new THREE.Mesh(mGeo, mobiusMat);
+    mobiusMesh.rotation.x = Math.PI / 2;
+    mobiusMesh.position.set(0, 0, -2);
+    scene.add(mobiusMesh);
+
+    // Core glow sphere
+    coreGlow = new THREE.Mesh(
+        new THREE.SphereGeometry(0.6, 32, 32),
+        new THREE.MeshBasicMaterial({ color: 0x00E5FF, transparent: true, opacity: 0.15 })
+    );
+    coreGlow.position.copy(mobiusMesh.position);
+    scene.add(coreGlow);
+}
+
+function buildAmbientParticles() {
+    const count = 120;
+    const geo = new THREE.BufferGeometry();
+    const pos = new Float32Array(count * 3);
+    const cols = new Float32Array(count * 3);
+    for (let i = 0; i < count * 3; i += 3) {
+        const r = 2 + Math.random() * 8;
+        const theta = Math.random() * Math.PI * 2;
+        const phi = Math.random() * Math.PI;
+        pos[i] = r * Math.sin(phi) * Math.cos(theta);
+        pos[i+1] = r * Math.cos(phi);
+        pos[i+2] = r * Math.sin(phi) * Math.sin(theta) - 2;
+        const mix = Math.random();
+        const col = new THREE.Color().lerpColors(new THREE.Color(0x00E5FF), new THREE.Color(0x7B2D8E), mix);
+        cols[i] = col.r; cols[i+1] = col.g; cols[i+2] = col.b;
+    }
+    geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    geo.setAttribute('color', new THREE.BufferAttribute(cols, 3));
+    const mat = new THREE.PointsMaterial({
+        size: 0.06, vertexColors: true, transparent: true, opacity: 0.4,
+        blending: THREE.AdditiveBlending
+    });
+    const particles = new THREE.Points(geo, mat);
+    particles.userData.isAmbient = true;
+    scene.add(particles);
+}
+
+function animate() {
+    requestAnimationFrame(animate);
+    time += 0.008; // Slow, meditative pace
+
+    // Möbius rotation — very slow
+    if (mobiusMesh) {
+        mobiusMesh.rotation.z = time * 0.08;
+        mobiusMat.uniforms.uTime.value = time * 10;
+    }
+
+    // Core glow pulse
+    if (coreGlow) {
+        coreGlow.material.opacity = 0.1 + Math.sin(time * 2) * 0.05;
+    }
+
+    // Ambient particles drift
+    scene.children.forEach(c => {
+        if (c.userData.isAmbient) {
+            c.rotation.y = time * 0.015;
+            c.rotation.x = Math.sin(time * 0.5) * 0.03;
+        }
+    });
+
+    // Camera subtle breathe
+    camera.position.y = 2 + Math.sin(time * 0.8) * 0.15;
+    camera.lookAt(0, 0, -2);
+
+    renderer.render(scene, camera);
+}
+
+// ═══════════════════════════════════════════════
+// UI: AVATAR CAROUSEL
+// ═══════════════════════════════════════════════
+
+function renderAvatarCarousel() {
+    const container = document.getElementById('avatar-carousel');
+    container.innerHTML = AGENTS.map((a, i) => `
+        <div class="avatar-slot ${i === 0 ? 'active' : ''}" data-agent-idx="${i}" onclick="selectAgent(${i})">
+            <div class="avatar-orb">
+                <div class="status-ring ${a.st}"></div>
+                ${a.cs}
+            </div>
+            <div class="avatar-label">${a.role.split(' ')[0]}</div>
+        </div>
+    `).join('');
+}
+
+let selectedAgentIdx = null;
+
+function selectAgent(idx) {
+    // Update carousel active state
+    document.querySelectorAll('.avatar-slot').forEach((s, i) => {
+        s.classList.toggle('active', i === idx);
+    });
+
+    // Show detail panel
+    selectedAgentIdx = idx;
+    const a = AGENTS[idx];
+    document.getElementById('ad-cs').textContent = a.cs;
+    const statusEl = document.getElementById('ad-status');
+    statusEl.textContent = a.st;
+    statusEl.className = 'agent-detail-status ' + a.st;
+    document.getElementById('ad-role').textContent = a.fullRole + (a.model !== '—' ? ' · ' + a.model : '');
+
+    // Reset to overview tab
+    document.querySelectorAll('.agent-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === 'overview'));
+    renderAgentTabContent('overview', idx);
+
+    const detail = document.getElementById('agent-detail');
+    detail.classList.add('visible');
+}
+
+function closeAgentDetail() {
+    document.getElementById('agent-detail').classList.remove('visible');
+    selectedAgentIdx = null;
+    document.querySelectorAll('.avatar-slot').forEach(s => s.classList.remove('active'));
+}
+
+function switchAgentTab(el) {
+    document.querySelectorAll('.agent-tab').forEach(t => t.classList.remove('active'));
+    el.classList.add('active');
+    if (selectedAgentIdx !== null) {
+        renderAgentTabContent(el.dataset.tab, selectedAgentIdx);
+    }
+}
+
+function renderAgentTabContent(tab, idx) {
+    const a = AGENTS[idx];
+    const content = document.getElementById('ad-content');
+
+    if (tab === 'overview') {
+        content.innerHTML = `
+            <div class="stat-row"><span class="stat-label">Callsign</span><span class="stat-value">${a.cs}</span></div>
+            <div class="stat-row"><span class="stat-label">Role</span><span class="stat-value">${a.fullRole}</span></div>
+            <div class="stat-row"><span class="stat-label">Model</span><span class="stat-value">${a.model}</span></div>
+            <div class="stat-row"><span class="stat-label">Status</span><span class="stat-value">${a.st}</span></div>
+            <div class="stat-row"><span class="stat-label">Uptime</span><span class="stat-value">${a.st === 'online' ? '2h 14m' : a.st === 'busy' ? '45m' : '—'}</span></div>
+            <div class="stat-row"><span class="stat-label">Last ping</span><span class="stat-value">${a.st !== 'offline' ? '< 1m' : '> 24h'}</span></div>
+        `;
+    } else if (tab === 'messages') {
+        const msgs = MESSAGES.filter(m => m.from === a.cs || m.to === a.cs);
+        if (msgs.length === 0) {
+            content.innerHTML = '<div style="color:var(--gray-text);padding:12px 0;">Нет сообщений</div>';
+        } else {
+            content.innerHTML = msgs.map(m => `
+                <div class="msg-row">
+                    <div class="msg-route">${m.from}<span class="arr"> → </span>${m.to}</div>
+                    <div class="msg-body-wrap">
+                        <div class="msg-topic">${m.topic} <span class="pri ${m.pri.toLowerCase()}">${m.pri}</span></div>
+                        <div class="msg-txt">${m.body}</div>
+                    </div>
+                    <div class="msg-time">${m.time}</div>
+                </div>
+            `).join('');
+        }
+    } else if (tab === 'tasks') {
+        const tasks = TASKS.filter(t => t.who.includes(a.cs));
+        if (tasks.length === 0) {
+            content.innerHTML = '<div style="color:var(--gray-text);padding:12px 0;">Нет назначенных задач</div>';
+        } else {
+            content.innerHTML = tasks.map(t => `
+                <div class="task-row">
+                    <span class="task-id">${t.id}</span>
+                    <div class="task-info">
+                        <div class="task-name">${t.title}</div>
+                        <div class="task-meta"><span>${t.pri}</span></div>
+                    </div>
+                </div>
+            `).join('');
+        }
+    }
+}
+
+// ═══════════════════════════════════════════════
+// UI: MASTER PANEL WIDGET (5 slide-up panels)
+// ═══════════════════════════════════════════════
+
+let activePanel = null;
+
+function togglePanel(btn) {
+    const panelId = btn.dataset.panel;
+    const panel = document.getElementById(panelId);
+
+    if (activePanel === panelId) {
+        // Close
+        panel.classList.remove('visible');
+        btn.classList.remove('active');
+        activePanel = null;
+    } else {
+        // Close previous
+        document.querySelectorAll('.slide-panel').forEach(p => p.classList.remove('visible'));
+        document.querySelectorAll('.dock-btn').forEach(b => b.classList.remove('active'));
+
+        // Open new
+        panel.classList.add('visible');
+        btn.classList.add('active');
+        activePanel = panelId;
+    }
+}
+
+// Escape closes panel
+document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') {
+        if (document.getElementById('agent-detail').classList.contains('visible')) {
+            closeAgentDetail();
+        } else if (activePanel) {
+            document.querySelectorAll('.slide-panel').forEach(p => p.classList.remove('visible'));
+            document.querySelectorAll('.dock-btn').forEach(b => b.classList.remove('active'));
+            activePanel = null;
+        }
+    }
+});
+
+// ═══════════════════════════════════════════════
+// UI: RENDER DATA INTO PANELS
+// ═══════════════════════════════════════════════
+
+function renderAgentsGrid() {
+    document.getElementById('agents-grid').innerHTML = AGENTS.map(a => `
+        <div class="agent-card">
+            <div class="agent-card-top">
+                <span class="agent-cs">${a.cs}</span>
+                <span class="sd ${a.st}"></span>
+            </div>
+            <div class="agent-role">${a.fullRole}</div>
+        </div>
+    `).join('');
+}
+
+function renderMessages() {
+    document.getElementById('msg-list').innerHTML = MESSAGES.map(m => `
+        <div class="msg-row">
+            <div class="msg-route">${m.from}<span class="arr"> → </span>${m.to}</div>
+            <div class="msg-body-wrap">
+                <div class="msg-topic">${m.topic} <span class="pri ${m.pri.toLowerCase()}">${m.pri}</span></div>
+                <div class="msg-txt">${m.body}</div>
+            </div>
+            <div class="msg-time">${m.time}</div>
+        </div>
+    `).join('');
+}
+
+function renderTasks() {
+    document.getElementById('task-list').innerHTML = TASKS.map(t => `
+        <div class="task-row">
+            <span class="task-id">${t.id}</span>
+            <div class="task-info">
+                <div class="task-name">${t.title}</div>
+                <div class="task-meta">
+                    <span>${t.pri}</span>
+                    <span style="color:var(--cyan)">${t.who}</span>
+                </div>
+            </div>
+        </div>
+    `).join('');
+}
+
+function renderActions() {
+    document.getElementById('actions-grid').innerHTML = ACTIONS.map(a => `
+        <div class="act-btn" onclick="alert('${a.label}: Coming soon...')">
+            <div class="act-icon">${a.icon}</div>
+            <div>
+                <div class="act-label">${a.label}</div>
+                <div class="act-desc">${a.desc}</div>
+            </div>
+        </div>
+    `).join('');
+}
+
+// ═══════════════════════════════════════════════
+// CLOCK + SESSION
+// ═══════════════════════════════════════════════
+
+function updateClock() {
+    const now = new Date();
+    document.getElementById('hud-clock').textContent = now.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    document.getElementById('hud-date').textContent = now.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' });
+}
+
+function generateSessionId() {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    let id = '';
+    for (let i = 0; i < 6; i++) id += chars[Math.floor(Math.random() * chars.length)];
+    document.getElementById('session-id').textContent = 'SESSION ' + id;
+}
+
+// ═══════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════
+
+renderAvatarCarousel();
+renderAgentsGrid();
+renderMessages();
+renderTasks();
+renderActions();
+updateClock();
+setInterval(updateClock, 1000);
+generateSessionId();
+initScene();
+
+</script>
+
+<!-- AI³ Navigator Widget -->
+<div id="nav-widget" style="
+    position: fixed;
+    top: 70px;
+    left: 24px;
+    width: 120px;
+    height: 120px;
+    z-index: 9999;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 0 20px rgba(0,229,255,0.15);
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+" onmouseenter="this.style.transform='scale(1.08)';this.style.boxShadow='0 0 30px rgba(0,229,255,0.3)'" onmouseleave="this.style.transform='scale(1)';this.style.boxShadow='0 0 20px rgba(0,229,255,0.15)'">
+    <iframe src="../navigator-widget/index.html" 
+        style="width:600px;height:600px;border:none;transform:scale(0.2);transform-origin:top left;pointer-events:none;"
+    ></iframe>
+    <div onclick="window.location.href='../navigator-inner/index.html'" 
+        style="position:absolute;top:0;left:0;right:0;bottom:0;z-index:1;cursor:pointer;">
+    </div>
+</div>
+<!-- /AI3 Navigator Widget -->
+
+</body>
+</html>

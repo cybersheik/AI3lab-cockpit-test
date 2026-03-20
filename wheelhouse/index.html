@@ -1,0 +1,1290 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI³ Venture Engine — Holographic Architecture</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+        
+        :root {
+            --ai3-cyan: #00D9FF;
+            --ai3-purple: #BD00FF;
+            --ai3-dark: #0A0A0F;
+            --ai3-gray: #1A1A24;
+        }
+        
+        body { 
+            margin: 0; 
+            overflow: hidden; 
+            background: var(--ai3-dark); 
+            font-family: 'Inter', sans-serif;
+        }
+        
+        #canvas-container { 
+            position: fixed; 
+            top: 0; 
+            left: 0; 
+            width: 100%; 
+            height: 100%; 
+            z-index: 1; 
+        }
+        
+        .hud-overlay {
+            position: fixed;
+            z-index: 10;
+            pointer-events: none;
+        }
+        
+        .scan-line {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, var(--ai3-cyan), var(--ai3-purple), transparent);
+            animation: scan 4s linear infinite;
+            pointer-events: none;
+            z-index: 20;
+            opacity: 0.6;
+        }
+        
+        @keyframes scan {
+            0% { transform: translateY(0); opacity: 0; }
+            10% { opacity: 0.8; }
+            90% { opacity: 0.8; }
+            100% { transform: translateY(100vh); opacity: 0; }
+        }
+        
+        .neon-text {
+            text-shadow: 0 0 10px var(--ai3-cyan), 0 0 30px var(--ai3-purple);
+        }
+        
+        .glass-panel {
+            background: rgba(26, 26, 36, 0.7);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(0, 217, 255, 0.2);
+            box-shadow: 0 0 40px rgba(0, 217, 255, 0.1), inset 0 0 20px rgba(189, 0, 255, 0.05);
+        }
+        
+        .scene-btn {
+            pointer-events: auto;
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .scene-btn::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(0, 217, 255, 0.2), transparent);
+            transition: left 0.5s;
+        }
+        
+        .scene-btn:hover::before {
+            left: 100%;
+        }
+        
+        .scene-btn:hover {
+            transform: translateX(10px);
+            border-color: var(--ai3-cyan);
+            box-shadow: 0 0 30px rgba(0, 217, 255, 0.3);
+        }
+        
+        .scene-btn.active {
+            background: linear-gradient(135deg, rgba(0, 217, 255, 0.15), rgba(189, 0, 255, 0.15));
+            border-color: var(--ai3-cyan);
+            box-shadow: 0 0 30px rgba(0, 217, 255, 0.2);
+        }
+        
+        .gradient-text {
+            background: linear-gradient(135deg, var(--ai3-cyan), var(--ai3-purple));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .brand-mobius {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 30;
+            width: 60px;
+            height: 60px;
+            filter: drop-shadow(0 0 20px rgba(0, 217, 255, 0.5));
+        }
+        
+        .loading-bar {
+            width: 0%;
+            height: 2px;
+            background: linear-gradient(90deg, var(--ai3-cyan), var(--ai3-purple));
+            transition: width 0.5s ease;
+        }
+        
+        .particle-trail {
+            position: absolute;
+            width: 2px;
+            height: 2px;
+            background: var(--ai3-cyan);
+            border-radius: 50%;
+            pointer-events: none;
+            opacity: 0.6;
+        }
+    </style>
+</head>
+<body class="bg-[#0A0A0F] text-white">
+
+    <!-- Brand Logo -->
+    <svg class="brand-mobius" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+            <linearGradient id="brandGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" style="stop-color:#00D9FF;stop-opacity:1" />
+                <stop offset="100%" style="stop-color:#BD00FF;stop-opacity:1" />
+            </linearGradient>
+            <filter id="glow">
+                <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+                <feMerge>
+                    <feMergeNode in="coloredBlur"/>
+                    <feMergeNode in="SourceGraphic"/>
+                </feMerge>
+            </filter>
+        </defs>
+        <path d="M50 10 C70 10, 85 30, 85 50 C85 70, 70 85, 50 85 C30 85, 15 70, 15 50 C15 30, 30 15, 50 15" 
+              stroke="url(#brandGradient)" stroke-width="8" fill="none" stroke-linecap="round" filter="url(#glow)">
+            <animate attributeName="stroke-dasharray" from="0, 300" to="300, 0" dur="3s" repeatCount="indefinite"/>
+        </path>
+        <path d="M50 25 C65 25, 75 35, 75 50 C75 65, 65 75, 50 75 C35 75, 25 65, 25 50 C25 35, 35 25, 50 25" 
+              stroke="url(#brandGradient)" stroke-width="6" fill="none" opacity="0.6" stroke-linecap="round">
+            <animate attributeName="stroke-dasharray" from="0, 300" to="300, 0" dur="3s" begin="1.5s" repeatCount="indefinite"/>
+        </path>
+        <circle cx="50" cy="50" r="5" fill="white" filter="url(#glow)">
+            <animate attributeName="r" values="5;8;5" dur="2s" repeatCount="indefinite"/>
+            <animate attributeName="opacity" values="1;0.5;1" dur="2s" repeatCount="indefinite"/>
+        </circle>
+    </svg>
+
+    <!-- Scan Line Effect (disabled — distracting) -->
+    <!-- <div class="scan-line"></div> -->
+
+    <!-- HUD Overlay -->
+    <div class="hud-overlay top-0 left-0 w-full p-6 flex justify-between items-start mt-16">
+        <div class="glass-panel p-6 rounded-2xl hologram-flicker max-w-md">
+            <div class="flex items-center gap-3 mb-3">
+                <div class="w-3 h-3 rounded-full bg-gradient-to-r from-[#00D9FF] to-[#BD00FF] animate-pulse"></div>
+                <h1 class="text-2xl font-bold tracking-wider gradient-text">AI³ VENTURE ENGINE</h1>
+            </div>
+            <div class="text-xs text-gray-400 mt-1 font-medium tracking-widest uppercase">Multi-Agent Orchestration Protocol</div>
+            <div class="mt-4 flex items-center gap-3 text-xs">
+                <span class="px-2 py-1 rounded bg-[#00D9FF]/20 text-[#00D9FF] border border-[#00D9FF]/30">AGENT 1: STRATEGY</span>
+                <span class="px-2 py-1 rounded bg-[#BD00FF]/20 text-[#BD00FF] border border-[#BD00FF]/30">AGENT 2: INFRA</span>
+                <span class="px-2 py-1 rounded bg-white/10 text-white border border-white/20">AGENT 3: LOGIC</span>
+            </div>
+        </div>
+        
+        <div class="glass-panel p-6 rounded-2xl text-right">
+            <div class="text-xs text-gray-500 font-medium mb-1 uppercase tracking-wider">System Status</div>
+            <div class="text-3xl font-bold gradient-text mb-1">ACTIVE</div>
+            <div class="text-xs text-gray-400 font-mono">TTL: 600s | SYNC: NOMINAL</div>
+        </div>
+    </div>
+
+    <!-- Scene Selector -->
+    <div class="hud-overlay left-6 top-1/2 transform -translate-y-1/2 flex flex-col gap-4">
+        <button onclick="switchScene(0)" id="btn-scene-0" class="scene-btn active glass-panel px-8 py-6 text-left border-l-4 border-[#00D9FF] rounded-r-xl">
+            <div class="text-xs text-[#00D9FF] font-bold mb-1 tracking-widest">SCENE 01</div>
+            <div class="font-bold text-xl text-white mb-1">GLOBAL ARCHITECTURE</div>
+            <div class="text-xs text-gray-400">Cloud ↔ Mac ↔ Mobile Synergy</div>
+        </button>
+        
+        <button onclick="switchScene(1)" id="btn-scene-1" class="scene-btn glass-panel px-8 py-6 text-left border-l-4 border-[#BD00FF] rounded-r-xl">
+            <div class="text-xs text-[#BD00FF] font-bold mb-1 tracking-widest">SCENE 02</div>
+            <div class="font-bold text-xl text-white mb-1">MAC CORE HUB</div>
+            <div class="text-xs text-gray-400">File Bus & Bridge Orchestrator</div>
+        </button>
+        
+        <button onclick="switchScene(2)" id="btn-scene-2" class="scene-btn glass-panel px-8 py-6 text-left border-l-4 border-white rounded-r-xl">
+            <div class="text-xs text-white font-bold mb-1 tracking-widest">SCENE 03</div>
+            <div class="font-bold text-xl text-white mb-1">MOBILE EDGE</div>
+            <div class="text-xs text-gray-400">Termux Node Clusters</div>
+        </button>
+    </div>
+
+    <!-- Info Panel -->
+    <div class="hud-overlay bottom-6 right-6 max-w-lg">
+        <div class="glass-panel p-6 rounded-2xl" id="info-panel">
+            <h2 class="text-2xl font-bold mb-3 gradient-text" id="info-title">Neural Architecture Overview</h2>
+            <p class="text-sm text-gray-300 leading-relaxed mb-4" id="info-desc">
+                Distributed AI ecosystem showing the Cloud Core with three specialized agents. Data flows through the Möbius Bridge to local infrastructure, distributing to mobile edge devices.
+            </p>
+            <div class="grid grid-cols-3 gap-3 text-xs font-semibold">
+                <div class="p-3 rounded-xl bg-gradient-to-br from-[#00D9FF]/20 to-transparent border border-[#00D9FF]/30 text-[#00D9FF] text-center">
+                    <div class="text-2xl mb-1">☁</div>
+                    <div>AI CORE</div>
+                </div>
+                <div class="p-3 rounded-xl bg-gradient-to-br from-[#BD00FF]/20 to-transparent border border-[#BD00FF]/30 text-[#BD00FF] text-center">
+                    <div class="text-2xl mb-1">⌘</div>
+                    <div>MAC HUB</div>
+                </div>
+                <div class="p-3 rounded-xl bg-gradient-to-br from-white/10 to-transparent border border-white/20 text-white text-center">
+                    <div class="text-2xl mb-1">📱</div>
+                    <div>EDGE</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading Indicator -->
+    <div id="loader" class="fixed inset-0 bg-[#0A0A0F] z-50 flex items-center justify-center">
+        <div class="text-center">
+            <div class="w-24 h-24 mb-6 mx-auto relative">
+                <div class="absolute inset-0 rounded-full border-4 border-[#1A1A24]"></div>
+                <div class="absolute inset-0 rounded-full border-4 border-t-[#00D9FF] border-r-[#BD00FF] border-b-transparent border-l-transparent animate-spin"></div>
+                <div class="absolute inset-4 rounded-full bg-gradient-to-br from-[#00D9FF]/20 to-[#BD00FF]/20 flex items-center justify-center">
+                    <span class="text-2xl font-bold gradient-text">AI³</span>
+                </div>
+            </div>
+            <div class="text-xl font-bold mb-2 gradient-text">INITIALIZING HOLOGRAM</div>
+            <div class="w-64 h-1 bg-[#1A1A24] rounded-full overflow-hidden mx-auto">
+                <div class="loading-bar" id="loading-progress"></div>
+            </div>
+            <div class="text-xs text-gray-600 mt-3 font-mono uppercase tracking-widest">Loading Brand Assets...</div>
+        </div>
+    </div>
+
+    <!-- 3D Canvas -->
+    <div id="canvas-container"></div>
+
+    <script>
+        // AI³ Brand Colors
+        const BRAND = {
+            cyan: 0x00D9FF,
+            purple: 0xBD00FF,
+            dark: 0x0A0A0F,
+            gray: 0x1A1A24,
+            white: 0xFFFFFF
+        };
+
+        // Global Variables
+        let scene, camera, renderer, controls;
+        let currentScene = 0;
+        let particles = [];
+        let time = 0;
+        const mouse = new THREE.Vector2();
+        
+        // Scene Groups
+        let scene1Group, scene2Group, scene3Group;
+        let activeGroup;
+        let mobiusRings = [];
+
+        function init() {
+            // Scene Setup
+            scene = new THREE.Scene();
+            scene.fog = new THREE.FogExp2(BRAND.dark, 0.015);
+            
+            // Camera
+            camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.set(0, 6, 18);
+            
+            // Renderer
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            renderer.toneMapping = THREE.ACESFilmicToneMapping;
+            document.getElementById('canvas-container').appendChild(renderer.domElement);
+            
+            // Controls
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+            controls.maxDistance = 40;
+            controls.minDistance = 3;
+            
+            // Lighting
+            const ambientLight = new THREE.AmbientLight(BRAND.dark, 0.4);
+            scene.add(ambientLight);
+            
+            const pointLight1 = new THREE.PointLight(BRAND.cyan, 2, 60);
+            pointLight1.position.set(15, 15, 15);
+            scene.add(pointLight1);
+            
+            const pointLight2 = new THREE.PointLight(BRAND.purple, 2, 60);
+            pointLight2.position.set(-15, 10, -15);
+            scene.add(pointLight2);
+            
+            const centerLight = new THREE.PointLight(BRAND.white, 1, 30);
+            centerLight.position.set(0, 5, 0);
+            scene.add(centerLight);
+            
+            // Create Scenes
+            createScene1();
+            createScene2();
+            createScene3();
+            
+            // Initial State
+            scene2Group.visible = false;
+            scene3Group.visible = false;
+            activeGroup = scene1Group;
+            
+            // Event Listeners
+            window.addEventListener('resize', onWindowResize);
+            document.addEventListener('mousemove', onMouseMove);
+            
+            // Loading
+            animateLoading();
+        }
+
+        function animateLoading() {
+            const bar = document.getElementById('loading-progress');
+            const loader = document.getElementById('loader');
+            
+            setTimeout(() => bar.style.width = '30%', 200);
+            setTimeout(() => bar.style.width = '70%', 800);
+            setTimeout(() => bar.style.width = '100%', 1400);
+            setTimeout(() => {
+                loader.style.opacity = '0';
+                loader.style.transition = 'opacity 0.5s';
+                setTimeout(() => loader.style.display = 'none', 500);
+            }, 1800);
+        }
+
+        // Create Möbius Ribbon Geometry
+        function createMobiusRibbon(radius, tube, segments) {
+            const geometry = new THREE.BufferGeometry();
+            const vertices = [];
+            const indices = [];
+            const uvs = [];
+            
+            const segmentsU = segments;
+            const segmentsV = 20;
+            
+            for (let i = 0; i <= segmentsU; i++) {
+                const u = (i / segmentsU) * Math.PI * 2;
+                for (let j = 0; j <= segmentsV; j++) {
+                    const v = (j / segmentsV) * 2 - 1;
+                    
+                    const x = (radius + tube * v * Math.cos(u / 2)) * Math.cos(u);
+                    const y = (radius + tube * v * Math.cos(u / 2)) * Math.sin(u);
+                    const z = tube * v * Math.sin(u / 2);
+                    
+                    vertices.push(x, y, z);
+                    uvs.push(i / segmentsU, j / segmentsV);
+                }
+            }
+            
+            for (let i = 0; i < segmentsU; i++) {
+                for (let j = 0; j < segmentsV; j++) {
+                    const a = i * (segmentsV + 1) + j;
+                    const b = (i + 1) * (segmentsV + 1) + j;
+                    const c = (i + 1) * (segmentsV + 1) + (j + 1);
+                    const d = i * (segmentsV + 1) + (j + 1);
+                    
+                    indices.push(a, b, d);
+                    indices.push(b, c, d);
+                }
+            }
+            
+            geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+            geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+            geometry.setIndex(indices);
+            geometry.computeVertexNormals();
+            
+            return geometry;
+        }
+
+        // Create Holographic Material with Brand Gradient
+        function createHologramMaterial(primaryColor, opacity) {
+            return new THREE.MeshPhongMaterial({
+                color: primaryColor,
+                transparent: true,
+                opacity: opacity,
+                emissive: primaryColor,
+                emissiveIntensity: 0.4,
+                side: THREE.DoubleSide,
+                shininess: 100,
+                specular: BRAND.white
+            });
+        }
+
+        // Create Brand Label
+        function createLabel(text, color, size) {
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            canvas.width = 1024;
+            canvas.height = 256;
+            
+            ctx.fillStyle = 'rgba(0,0,0,0)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            ctx.font = '800 60px Inter, sans-serif';
+            ctx.fillStyle = color;
+            ctx.textAlign = 'center';
+            ctx.shadowColor = color;
+            ctx.shadowBlur = 30;
+            ctx.fillText(text, 512, 160);
+            
+            const texture = new THREE.CanvasTexture(canvas);
+            const spriteMat = new THREE.SpriteMaterial({ 
+                map: texture, 
+                transparent: true,
+                opacity: 0.95,
+                blending: THREE.AdditiveBlending
+            });
+            const sprite = new THREE.Sprite(spriteMat);
+            sprite.scale.set(size * 6, size * 1.5, 1);
+            return sprite;
+        }
+
+        // Create Energy Core (Pulsing Sphere)
+        function createEnergyCore(size, color) {
+            const group = new THREE.Group();
+            
+            // Core sphere
+            const coreGeo = new THREE.SphereGeometry(size, 32, 32);
+            const coreMat = new THREE.MeshBasicMaterial({
+                color: BRAND.white,
+                transparent: true,
+                opacity: 0.9
+            });
+            const core = new THREE.Mesh(coreGeo, coreMat);
+            group.add(core);
+            
+            // Glow ring 1
+            const ring1Geo = new THREE.RingGeometry(size * 1.5, size * 1.8, 32);
+            const ring1Mat = new THREE.MeshBasicMaterial({
+                color: color,
+                transparent: true,
+                opacity: 0.4,
+                side: THREE.DoubleSide
+            });
+            const ring1 = new THREE.Mesh(ring1Geo, ring1Mat);
+            ring1.userData = { pulse: true, speed: 2, offset: 0 };
+            group.add(ring1);
+            
+            // Glow ring 2
+            const ring2Geo = new THREE.RingGeometry(size * 2.2, size * 2.5, 32);
+            const ring2Mat = new THREE.MeshBasicMaterial({
+                color: color,
+                transparent: true,
+                opacity: 0.2,
+                side: THREE.DoubleSide
+            });
+            const ring2 = new THREE.Mesh(ring2Geo, ring2Mat);
+            ring2.userData = { pulse: true, speed: 1.5, offset: 1 };
+            group.add(ring2);
+            
+            return group;
+        }
+
+        // SCENE 1: Global Architecture with Brand Identity
+        function createScene1() {
+            scene1Group = new THREE.Group();
+            
+            // 1. Central Möbius Structure (AI³ Core)
+            const mobiusGeo = createMobiusRibbon(3, 0.8, 100);
+            
+            const mobiusMat = new THREE.ShaderMaterial({
+                uniforms: {
+                    time: { value: 0 },
+                    color1: { value: new THREE.Color(BRAND.cyan) },
+                    color2: { value: new THREE.Color(BRAND.purple) }
+                },
+                vertexShader: `
+                    varying vec2 vUv;
+                    varying vec3 vNormal;
+                    void main() {
+                        vUv = uv;
+                        vNormal = normalize(normalMatrix * normal);
+                        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+                    }
+                `,
+                fragmentShader: `
+                    uniform float time;
+                    uniform vec3 color1;
+                    uniform vec3 color2;
+                    varying vec2 vUv;
+                    varying vec3 vNormal;
+                    
+                    void main() {
+                        float mixFactor = sin(vUv.x * 6.28 + time) * 0.5 + 0.5;
+                        vec3 color = mix(color1, color2, mixFactor);
+                        float alpha = 0.6 + sin(vUv.x * 20.0) * 0.2;
+                        gl_FragColor = vec4(color, alpha);
+                    }
+                `,
+                transparent: true,
+                side: THREE.DoubleSide
+            });
+            
+            const mobius = new THREE.Mesh(mobiusGeo, mobiusMat);
+            mobius.position.set(0, 8, 0);
+            mobius.rotation.x = Math.PI / 2;
+            mobius.userData = { isMobius: true, material: mobiusMat };
+            scene1Group.add(mobius);
+            mobiusRings.push(mobius);
+            
+            // Wireframe overlay
+            const wireMat = new THREE.MeshBasicMaterial({
+                color: BRAND.cyan,
+                wireframe: true,
+                transparent: true,
+                opacity: 0.1
+            });
+            const wireMobius = new THREE.Mesh(mobiusGeo, wireMat);
+            wireMobius.position.copy(mobius.position);
+            wireMobius.rotation.copy(mobius.rotation);
+            wireMobius.userData = { isMobius: true };
+            scene1Group.add(wireMobius);
+            mobiusRings.push(wireMobius);
+            
+            // Central Energy Core
+            const core = createEnergyCore(0.5, BRAND.cyan);
+            core.position.set(0, 8, 0);
+            scene1Group.add(core);
+            
+            // AI³ Label
+            const brandLabel = createLabel("AI³ VENTURE ENGINE", "#00D9FF", 1.0);
+            brandLabel.position.set(0, 11, 0);
+            scene1Group.add(brandLabel);
+            
+            // 2. Three Agent Nodes (Strategy, Infra, Logic)
+            const agents = [
+                { 
+                    name: "STRATEGY", 
+                    pos: [-4, 6, 2], 
+                    color: BRAND.cyan, 
+                    icon: "◆",
+                    desc: "AGENT 1"
+                },
+                { 
+                    name: "INFRASTRUCTURE", 
+                    pos: [4, 6, 2], 
+                    color: BRAND.purple, 
+                    icon: "◈",
+                    desc: "AGENT 2"
+                },
+                { 
+                    name: "LOGIC", 
+                    pos: [0, 6, -4], 
+                    color: BRAND.white, 
+                    icon: "◉",
+                    desc: "AGENT 3"
+                }
+            ];
+            
+            agents.forEach((agent, i) => {
+                const group = new THREE.Group();
+                group.position.set(...agent.pos);
+                
+                // Agent Orb
+                const orbGeo = new THREE.IcosahedronGeometry(0.6, 2);
+                const orbMat = createHologramMaterial(agent.color, 0.7);
+                const orb = new THREE.Mesh(orbGeo, orbMat);
+                orb.userData = { 
+                    float: true, 
+                    offset: i * 2,
+                    rotationSpeed: 0.01 + i * 0.005
+                };
+                group.add(orb);
+                
+                // Connection to center
+                const lineGeo = new THREE.BufferGeometry().setFromPoints([
+                    new THREE.Vector3(...agent.pos),
+                    new THREE.Vector3(0, 8, 0)
+                ]);
+                const lineMat = new THREE.LineBasicMaterial({ 
+                    color: agent.color, 
+                    transparent: true, 
+                    opacity: 0.3
+                });
+                const line = new THREE.Line(lineGeo, lineMat);
+                scene1Group.add(line);
+                
+                // Data particles along connection
+                const particleCount = 15;
+                for (let j = 0; j < particleCount; j++) {
+                    const pGeo = new THREE.SphereGeometry(0.04, 8, 8);
+                    const pMat = new THREE.MeshBasicMaterial({ color: agent.color });
+                    const p = new THREE.Mesh(pGeo, pMat);
+                    p.userData = {
+                        start: new THREE.Vector3(...agent.pos),
+                        end: new THREE.Vector3(0, 8, 0),
+                        progress: j / particleCount,
+                        speed: 0.002 + Math.random() * 0.002
+                    };
+                    scene1Group.add(p);
+                    particles.push(p);
+                }
+                
+                // Label
+                const label = createLabel(agent.name, "#" + agent.color.toString(16).padStart(6, '0'), 0.6);
+                label.position.set(agent.pos[0], agent.pos[1] - 1.2, agent.pos[2]);
+                scene1Group.add(label);
+                
+                const subLabel = createLabel(agent.desc, "#888888", 0.4);
+                subLabel.position.set(agent.pos[0], agent.pos[1] - 1.8, agent.pos[2]);
+                scene1Group.add(subLabel);
+                
+                scene1Group.add(group);
+            });
+            
+            // 3. Data Rivers (Cyan to Purple Gradient)
+            const curve = new THREE.CatmullRomCurve3([
+                new THREE.Vector3(0, 6, 0),
+                new THREE.Vector3(0, 3, 0),
+                new THREE.Vector3(0, 0, 0)
+            ]);
+            
+            const tubeGeo = new THREE.TubeGeometry(curve, 64, 0.4, 16, false);
+            const tubeMat = new THREE.ShaderMaterial({
+                uniforms: {
+                    time: { value: 0 },
+                    color1: { value: new THREE.Color(BRAND.cyan) },
+                    color2: { value: new THREE.Color(BRAND.purple) }
+                },
+                vertexShader: `
+                    varying vec2 vUv;
+                    void main() {
+                        vUv = uv;
+                        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+                    }
+                `,
+                fragmentShader: `
+                    uniform float time;
+                    uniform vec3 color1;
+                    uniform vec3 color2;
+                    varying vec2 vUv;
+                    
+                    void main() {
+                        float flow = fract(vUv.x - time * 0.5);
+                        vec3 color = mix(color1, color2, vUv.y);
+                        float glow = sin(flow * 3.14159 * 4.0) * 0.5 + 0.5;
+                        gl_FragColor = vec4(color, 0.4 + glow * 0.3);
+                    }
+                `,
+                transparent: true,
+                side: THREE.DoubleSide
+            });
+            
+            const dataRiver = new THREE.Mesh(tubeGeo, tubeMat);
+            dataRiver.userData = { isRiver: true, material: tubeMat };
+            scene1Group.add(dataRiver);
+            
+            // 4. Mac Hub with Brand Styling
+            const hubPlatform = new THREE.CylinderGeometry(5, 5, 0.2, 64);
+            const hubMat = new THREE.MeshPhongMaterial({
+                color: BRAND.gray,
+                transparent: true,
+                opacity: 0.8,
+                emissive: BRAND.cyan,
+                emissiveIntensity: 0.1
+            });
+            const hub = new THREE.Mesh(hubPlatform, hubMat);
+            hub.position.set(0, -0.5, 0);
+            scene1Group.add(hub);
+            
+            // Möbius Bridge (gm_bridge.py)
+            const bridgeGeo = createMobiusRibbon(1.5, 0.3, 50);
+            const bridgeMat = new THREE.MeshPhongMaterial({
+                color: BRAND.purple,
+                transparent: true,
+                opacity: 0.6,
+                emissive: BRAND.purple,
+                emissiveIntensity: 0.3
+            });
+            const bridge = new THREE.Mesh(bridgeGeo, bridgeMat);
+            bridge.position.set(0, 2, 0);
+            bridge.rotation.x = Math.PI / 2;
+            bridge.userData = { rotationSpeed: 0.005 };
+            scene1Group.add(bridge);
+            
+            const bridgeLabel = createLabel("gm_bridge.py", "#BD00FF", 0.7);
+            bridgeLabel.position.set(0, 3.5, 0);
+            scene1Group.add(bridgeLabel);
+            
+            // File Bus
+            const busGeo = new THREE.TorusGeometry(1, 0.3, 16, 100);
+            const busMat = createHologramMaterial(BRAND.white, 0.8);
+            const bus = new THREE.Mesh(busGeo, busMat);
+            bus.position.set(0, 1, 0);
+            bus.rotation.x = Math.PI / 2;
+            scene1Group.add(bus);
+            
+            // 5. Mobile Edge Devices
+            const devices = [
+                { name: "Z FOLD 7", pos: [-4, -4, 2], color: BRAND.cyan, type: 'fold' },
+                { name: "NOTE 20", pos: [0, -4, 4], color: BRAND.purple, type: 'note' },
+                { name: "TAB S10", pos: [4, -4, 2], color: BRAND.white, type: 'tab' }
+            ];
+            
+            devices.forEach((dev, i) => {
+                const group = new THREE.Group();
+                group.position.set(...dev.pos);
+                
+                // Device body
+                let bodyGeo;
+                if (dev.type === 'fold') bodyGeo = new THREE.BoxGeometry(1.4, 0.9, 0.05);
+                else if (dev.type === 'tab') bodyGeo = new THREE.BoxGeometry(2.2, 1.5, 0.05);
+                else bodyGeo = new THREE.BoxGeometry(0.9, 1.7, 0.05);
+                
+                const bodyMat = new THREE.MeshPhongMaterial({
+                    color: BRAND.gray,
+                    shininess: 100
+                });
+                const body = new THREE.Mesh(bodyGeo, bodyMat);
+                group.add(body);
+                
+                // Screen
+                const screenGeo = new THREE.PlaneGeometry(
+                    dev.type === 'tab' ? 2.0 : (dev.type === 'fold' ? 1.3 : 0.8),
+                    dev.type === 'tab' ? 1.4 : (dev.type === 'fold' ? 0.8 : 1.6)
+                );
+                const screenMat = new THREE.MeshBasicMaterial({ color: BRAND.dark });
+                const screen = new THREE.Mesh(screenGeo, screenMat);
+                screen.position.z = 0.03;
+                group.add(screen);
+                
+                // Terminal lines
+                for (let j = 0; j < 6; j++) {
+                    const lineGeo = new THREE.PlaneGeometry(0.6, 0.02);
+                    const lineMat = new THREE.MeshBasicMaterial({ 
+                        color: dev.color, 
+                        transparent: true, 
+                        opacity: 0.7 
+                    });
+                    const line = new THREE.Mesh(lineGeo, lineMat);
+                    line.position.set(0, 0.4 - j * 0.12, 0.04);
+                    group.add(line);
+                }
+                
+                // Holographic projection above device
+                const projGeo = new THREE.ConeGeometry(0.8, 1.5, 4, 1, true);
+                const projMat = new THREE.MeshBasicMaterial({
+                    color: dev.color,
+                    transparent: true,
+                    opacity: 0.1,
+                    wireframe: true,
+                    side: THREE.DoubleSide
+                });
+                const projection = new THREE.Mesh(projGeo, projMat);
+                projection.position.y = 1.2;
+                projection.userData = { float: true, offset: i };
+                group.add(projection);
+                
+                // Connection to Hub
+                const connCurve = new THREE.CatmullRomCurve3([
+                    new THREE.Vector3(0, -0.5, 0),
+                    new THREE.Vector3(dev.pos[0] * 0.5, -2, dev.pos[2] * 0.5),
+                    new THREE.Vector3(...dev.pos)
+                ]);
+                const connGeo = new THREE.TubeGeometry(connCurve, 20, 0.05, 8, false);
+                const connMat = new THREE.MeshBasicMaterial({ 
+                    color: dev.color, 
+                    transparent: true, 
+                    opacity: 0.4 
+                });
+                const conn = new THREE.Mesh(connGeo, connMat);
+                scene1Group.add(conn);
+                
+                // Label
+                const devLabel = createLabel(dev.name, "#" + dev.color.toString(16).padStart(6, '0'), 0.5);
+                devLabel.position.set(dev.pos[0], dev.pos[1] - 1.2, dev.pos[2]);
+                scene1Group.add(devLabel);
+                
+                scene1Group.add(group);
+            });
+            
+            // Ambient particles
+            const particlesGeo = new THREE.BufferGeometry();
+            const particleCount = 300;
+            const posArray = new Float32Array(particleCount * 3);
+            const colorArray = new Float32Array(particleCount * 3);
+            
+            for (let i = 0; i < particleCount * 3; i += 3) {
+                posArray[i] = (Math.random() - 0.5) * 30;
+                posArray[i+1] = (Math.random() - 0.5) * 20 + 5;
+                posArray[i+2] = (Math.random() - 0.5) * 30;
+                
+                const mix = Math.random();
+                const color = new THREE.Color().lerpColors(
+                    new THREE.Color(BRAND.cyan),
+                    new THREE.Color(BRAND.purple),
+                    mix
+                );
+                colorArray[i] = color.r;
+                colorArray[i+1] = color.g;
+                colorArray[i+2] = color.b;
+            }
+            
+            particlesGeo.setAttribute('position', new THREE.BufferAttribute(posArray, 3));
+            particlesGeo.setAttribute('color', new THREE.BufferAttribute(colorArray, 3));
+            
+            const particlesMat = new THREE.PointsMaterial({
+                size: 0.08,
+                vertexColors: true,
+                transparent: true,
+                opacity: 0.8,
+                blending: THREE.AdditiveBlending
+            });
+            
+            const particleSystem = new THREE.Points(particlesGeo, particlesMat);
+            particleSystem.userData = { isParticles: true };
+            scene1Group.add(particleSystem);
+            
+            scene.add(scene1Group);
+        }
+
+        // SCENE 2: Mac Core Hub
+        function createScene2() {
+            scene2Group = new THREE.Group();
+            
+            // Large Möbius structure as centerpiece
+            const mobiusGeo = createMobiusRibbon(4, 1, 100);
+            const mobiusMat = new THREE.ShaderMaterial({
+                uniforms: {
+                    time: { value: 0 },
+                    color1: { value: new THREE.Color(BRAND.purple) },
+                    color2: { value: new THREE.Color(BRAND.cyan) }
+                },
+                vertexShader: `
+                    varying vec2 vUv;
+                    void main() {
+                        vUv = uv;
+                        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+                    }
+                `,
+                fragmentShader: `
+                    uniform float time;
+                    uniform vec3 color1;
+                    uniform vec3 color2;
+                    varying vec2 vUv;
+                    
+                    void main() {
+                        float flow = fract(vUv.x * 2.0 - time * 0.3);
+                        vec3 color = mix(color1, color2, sin(vUv.x * 3.14159) * 0.5 + 0.5);
+                        float alpha = 0.5 + sin(flow * 3.14159 * 2.0) * 0.2;
+                        gl_FragColor = vec4(color, alpha);
+                    }
+                `,
+                transparent: true,
+                side: THREE.DoubleSide
+            });
+            
+            const mobius = new THREE.Mesh(mobiusGeo, mobiusMat);
+            mobius.rotation.x = Math.PI / 2;
+            mobius.position.y = 2;
+            mobius.userData = { isMobius: true, material: mobiusMat, rotationSpeed: 0.002 };
+            scene2Group.add(mobius);
+            
+            // File Bus Structure (Two interlocking Möbius strips)
+            const inboxGeo = createMobiusRibbon(1.2, 0.4, 40);
+            const inboxMat = createHologramMaterial(BRAND.cyan, 0.6);
+            const inbox = new THREE.Mesh(inboxGeo, inboxMat);
+            inbox.position.set(-3, 0, 0);
+            inbox.rotation.y = Math.PI / 4;
+            inbox.userData = { rotationSpeed: 0.01 };
+            scene2Group.add(inbox);
+            
+            const outboxGeo = createMobiusRibbon(1.2, 0.4, 40);
+            const outboxMat = createHologramMaterial(BRAND.purple, 0.6);
+            const outbox = new THREE.Mesh(outboxGeo, outboxMat);
+            outbox.position.set(3, 0, 0);
+            outbox.rotation.y = -Math.PI / 4;
+            outbox.userData = { rotationSpeed: -0.01 };
+            scene2Group.add(outbox);
+            
+            // Labels
+            const inboxLabel = createLabel("INBOX", "#00D9FF", 0.8);
+            inboxLabel.position.set(-3, -2, 0);
+            scene2Group.add(inboxLabel);
+            
+            const outboxLabel = createLabel("OUTBOX", "#BD00FF", 0.8);
+            outboxLabel.position.set(3, -2, 0);
+            scene2Group.add(outboxLabel);
+            
+            // Central Orchestrator
+            const core = createEnergyCore(0.8, BRAND.white);
+            core.position.set(0, 0, 0);
+            scene2Group.add(core);
+            
+            const bridgeLabel = createLabel("gm_bridge.py", "#FFFFFF", 0.7);
+            bridgeLabel.position.set(0, 2.5, 0);
+            scene2Group.add(bridgeLabel);
+            
+            // Data flow arrows
+            const arrowGeo = new THREE.ConeGeometry(0.15, 0.5, 8);
+            const arrowMat = new THREE.MeshBasicMaterial({ color: BRAND.cyan });
+            
+            for (let i = 0; i < 3; i++) {
+                const arrow = new THREE.Mesh(arrowGeo, arrowMat);
+                arrow.position.set(-1.5, 0, 0);
+                arrow.rotation.z = -Math.PI / 2;
+                arrow.userData = { animate: true, path: 'inbox', offset: i * 0.3 };
+                scene2Group.add(arrow);
+            }
+            
+            for (let i = 0; i < 3; i++) {
+                const arrow = new THREE.Mesh(arrowGeo, arrowMat);
+                arrow.position.set(1.5, 0, 0);
+                arrow.rotation.z = Math.PI / 2;
+                arrow.userData = { animate: true, path: 'outbox', offset: i * 0.3 };
+                scene2Group.add(arrow);
+            }
+            
+            // Background infrastructure icons
+            const infra = [
+                { pos: [-5, 3, -3], name: "DOCKER", color: BRAND.cyan },
+                { pos: [5, 3, -3], name: "DATABASE", color: BRAND.purple },
+                { pos: [0, 4, -4], name: "API GATEWAY", color: BRAND.white }
+            ];
+            
+            infra.forEach(item => {
+                const geo = new THREE.OctahedronGeometry(0.5, 0);
+                const mat = createHologramMaterial(item.color, 0.5);
+                const mesh = new THREE.Mesh(geo, mat);
+                mesh.position.set(...item.pos);
+                mesh.userData = { float: true, offset: Math.random() * 10 };
+                scene2Group.add(mesh);
+                
+                const label = createLabel(item.name, "#" + item.color.toString(16).padStart(6, '0'), 0.4);
+                label.position.set(item.pos[0], item.pos[1] - 1, item.pos[2]);
+                scene2Group.add(label);
+            });
+            
+            // Grid Floor
+            const gridHelper = new THREE.GridHelper(20, 20, BRAND.cyan, BRAND.gray);
+            gridHelper.position.y = -3;
+            gridHelper.material.opacity = 0.3;
+            gridHelper.material.transparent = true;
+            scene2Group.add(gridHelper);
+            
+            scene.add(scene2Group);
+        }
+
+        // SCENE 3: Mobile Edge
+        function createScene3() {
+            scene3Group = new THREE.Group();
+            
+            // Reflective surface
+            const surfaceGeo = new THREE.PlaneGeometry(25, 25);
+            const surfaceMat = new THREE.MeshPhongMaterial({
+                color: BRAND.gray,
+                shininess: 100,
+                reflectivity: 0.8,
+                transparent: true,
+                opacity: 0.5
+            });
+            const surface = new THREE.Mesh(surfaceGeo, surfaceMat);
+            surface.rotation.x = -Math.PI / 2;
+            surface.position.y = -2;
+            scene3Group.add(surface);
+            
+            // Devices arranged in triangle
+            const devices = [
+                { name: "Z FOLD 7", pos: [-4, 0, 2], color: BRAND.cyan, angle: 0.3 },
+                { name: "NOTE 20", pos: [4, 0, 2], color: BRAND.purple, angle: -0.3 },
+                { name: "TAB S10", pos: [0, 0, -3], color: BRAND.white, angle: 0 }
+            ];
+            
+            devices.forEach((dev, i) => {
+                const group = new THREE.Group();
+                group.position.set(...dev.pos);
+                group.rotation.y = dev.angle;
+                
+                // Device body
+                let bodyGeo;
+                if (dev.name === 'TAB S10') bodyGeo = new THREE.BoxGeometry(2.4, 1.6, 0.05);
+                else if (dev.name === 'Z FOLD 7') bodyGeo = new THREE.BoxGeometry(1.4, 0.9, 0.05);
+                else bodyGeo = new THREE.BoxGeometry(0.9, 1.7, 0.05);
+                
+                const bodyMat = new THREE.MeshPhongMaterial({
+                    color: BRAND.dark,
+                    shininess: 90
+                });
+                const body = new THREE.Mesh(bodyGeo, bodyMat);
+                group.add(body);
+                
+                // Screen
+                const screenW = dev.name === 'TAB S10' ? 2.2 : (dev.name === 'Z FOLD 7' ? 1.3 : 0.8);
+                const screenH = dev.name === 'TAB S10' ? 1.4 : (dev.name === 'Z FOLD 7' ? 0.8 : 1.6);
+                const screenGeo = new THREE.PlaneGeometry(screenW, screenH);
+                const screenMat = new THREE.MeshBasicMaterial({ color: BRAND.dark });
+                const screen = new THREE.Mesh(screenGeo, screenMat);
+                screen.position.z = 0.03;
+                group.add(screen);
+                
+                // Möbius ribbon hovering above
+                const ribbonGeo = createMobiusRibbon(0.8, 0.2, 30);
+                const ribbonMat = new THREE.MeshPhongMaterial({
+                    color: dev.color,
+                    transparent: true,
+                    opacity: 0.5,
+                    wireframe: true
+                });
+                const ribbon = new THREE.Mesh(ribbonGeo, ribbonMat);
+                ribbon.position.y = 1.5;
+                ribbon.rotation.x = Math.PI / 2;
+                ribbon.userData = { rotationSpeed: 0.02, float: true, offset: i };
+                group.add(ribbon);
+                
+                // Terminal content
+                const lineCount = dev.name === 'TAB S10' ? 10 : 6;
+                for (let j = 0; j < lineCount; j++) {
+                    const lineW = screenW * 0.8 * (0.5 + Math.random() * 0.5);
+                    const lineGeo = new THREE.PlaneGeometry(lineW, 0.02);
+                    const lineMat = new THREE.MeshBasicMaterial({ 
+                        color: dev.color, 
+                        transparent: true, 
+                        opacity: 0.6 + Math.random() * 0.4
+                    });
+                    const line = new THREE.Mesh(lineGeo, lineMat);
+                    line.position.set(0, 0.3 - j * 0.08, 0.05);
+                    group.add(line);
+                }
+                
+                // Connection lines to center
+                const lineGeo = new THREE.BufferGeometry().setFromPoints([
+                    new THREE.Vector3(...dev.pos),
+                    new THREE.Vector3(0, 5, 0)
+                ]);
+                const lineMat = new THREE.LineBasicMaterial({ 
+                    color: dev.color, 
+                    transparent: true, 
+                    opacity: 0.2 
+                });
+                const line = new THREE.Line(lineGeo, lineMat);
+                scene3Group.add(line);
+                
+                // Status indicator
+                const statusGeo = new THREE.SphereGeometry(0.1, 16, 16);
+                const statusMat = new THREE.MeshBasicMaterial({ color: dev.color });
+                const status = new THREE.Mesh(statusGeo, statusMat);
+                status.position.set(0, -screenH/2 - 0.3, 0.1);
+                group.add(status);
+                
+                const label = createLabel(dev.name, "#" + dev.color.toString(16).padStart(6, '0'), 0.5);
+                label.position.set(dev.pos[0], dev.pos[1] - 1.5, dev.pos[2]);
+                scene3Group.add(label);
+                
+                scene3Group.add(group);
+            });
+            
+            // Central network hub above
+            const hubGeo = new THREE.IcosahedronGeometry(1, 2);
+            const hubMat = new THREE.MeshBasicMaterial({
+                color: BRAND.white,
+                wireframe: true,
+                transparent: true,
+                opacity: 0.2
+            });
+            const hub = new THREE.Mesh(hubGeo, hubMat);
+            hub.position.set(0, 5, 0);
+            hub.userData = { rotationSpeed: 0.005 };
+            scene3Group.add(hub);
+            
+            // Energy core in hub
+            const core = createEnergyCore(0.4, BRAND.cyan);
+            core.position.set(0, 5, 0);
+            scene3Group.add(core);
+            
+            // Floating particles
+            const particleGeo = new THREE.BufferGeometry();
+            const particleCount = 200;
+            const positions = new Float32Array(particleCount * 3);
+            const colors = new Float32Array(particleCount * 3);
+            
+            for (let i = 0; i < particleCount; i++) {
+                const i3 = i * 3;
+                positions[i3] = (Math.random() - 0.5) * 20;
+                positions[i3+1] = Math.random() * 10;
+                positions[i3+2] = (Math.random() - 0.5) * 20;
+                
+                const color = new THREE.Color().lerpColors(
+                    new THREE.Color(BRAND.cyan),
+                    new THREE.Color(BRAND.purple),
+                    Math.random()
+                );
+                colors[i3] = color.r;
+                colors[i3+1] = color.g;
+                colors[i3+2] = color.b;
+            }
+            
+            particleGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+            particleGeo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+            
+            const particleMat = new THREE.PointsMaterial({
+                size: 0.06,
+                vertexColors: true,
+                transparent: true,
+                opacity: 0.8
+            });
+            
+            const particles = new THREE.Points(particleGeo, particleMat);
+            scene3Group.add(particles);
+            
+            scene.add(scene3Group);
+        }
+
+        // Animation Loop
+        function animate() {
+            requestAnimationFrame(animate);
+            time += 0.01;
+            
+            controls.update();
+            
+            // Update shader uniforms
+            scene.traverse((object) => {
+                if (object.userData.isMobius && object.userData.material) {
+                    object.userData.material.uniforms.time.value = time;
+                }
+                if (object.userData.isRiver && object.userData.material) {
+                    object.userData.material.uniforms.time.value = time;
+                }
+                
+                if (object.userData.rotationSpeed) {
+                    object.rotation.y += object.userData.rotationSpeed;
+                    object.rotation.x += object.userData.rotationSpeed * 0.5;
+                }
+                
+                if (object.userData.float) {
+                    object.position.y = 1.5 + Math.sin(time + object.userData.offset) * 0.2;
+                }
+                
+                if (object.userData.pulse) {
+                    const scale = 1 + Math.sin(time * object.userData.speed + object.userData.offset) * 0.2;
+                    object.scale.set(scale, scale, scale);
+                    object.material.opacity = 0.3 + Math.sin(time * object.userData.speed + object.userData.offset) * 0.1;
+                }
+            });
+            
+            // Animate data particles
+            particles.forEach(p => {
+                p.userData.progress += p.userData.speed;
+                if (p.userData.progress > 1) p.userData.progress = 0;
+                
+                const pos = new THREE.Vector3().lerpVectors(
+                    p.userData.start,
+                    p.userData.end,
+                    p.userData.progress
+                );
+                p.position.copy(pos);
+            });
+            
+            // Camera subtle movement
+            if (activeGroup) {
+                camera.position.x += (mouse.x * 3 - camera.position.x) * 0.02;
+                camera.position.y += (6 + mouse.y * 2 - camera.position.y) * 0.02;
+                camera.lookAt(activeGroup.position);
+            }
+            
+            renderer.render(scene, camera);
+        }
+
+        // Scene Switching
+        function switchScene(index) {
+            currentScene = index;
+            
+            document.querySelectorAll('.scene-btn').forEach((btn, i) => {
+                if (i === index) btn.classList.add('active');
+                else btn.classList.remove('active');
+            });
+            
+            scene1Group.visible = false;
+            scene2Group.visible = false;
+            scene3Group.visible = false;
+            
+            if (index === 0) {
+                scene1Group.visible = true;
+                activeGroup = scene1Group;
+                updateInfo(
+                    "Global Neural Architecture",
+                    "The AI³ Venture Engine distributed ecosystem. Three specialized agents (Strategy, Infrastructure, Logic) orchestrate through the Möbius Bridge, connecting Cloud Core to Mac Hub and mobile edge devices.",
+                    "Distributed Intelligence"
+                );
+                gsap.to(camera.position, { x: 0, y: 6, z: 18, duration: 1.5, ease: "power2.inOut" });
+            } else if (index === 1) {
+                scene2Group.visible = true;
+                activeGroup = scene2Group;
+                updateInfo(
+                    "Mac Core Command Center",
+                    "Local orchestration hub featuring the File Bus architecture with INBOX/OUTBOX folders. The gm_bridge.py script manages data flow between cloud services and local Docker containers and databases.",
+                    "Edge Orchestration"
+                );
+                gsap.to(camera.position, { x: 0, y: 3, z: 10, duration: 1.5, ease: "power2.inOut" });
+            } else {
+                scene3Group.visible = true;
+                activeGroup = scene3Group;
+                updateInfo(
+                    "Mobile Edge Infrastructure",
+                    "Field deployment showing Samsung Galaxy Z Fold 7, Note 20 Ultra, and Tab S10 Ultra. Devices run Termux nodes with Digital Twin metrics, maintaining sync with the Mac Core through secure protocols.",
+                    "Field Deployment"
+                );
+                gsap.to(camera.position, { x: 0, y: 2, z: 8, duration: 1.5, ease: "power2.inOut" });
+            }
+        }
+
+        function updateInfo(title, desc, subtitle) {
+            const titleEl = document.getElementById('info-title');
+            const descEl = document.getElementById('info-desc');
+            
+            gsap.to([titleEl, descEl], {
+                opacity: 0,
+                y: -10,
+                duration: 0.3,
+                onComplete: () => {
+                    titleEl.textContent = title;
+                    descEl.textContent = desc;
+                    titleEl.className = `text-xl font-bold mb-3 neon-text text-${subtitle === 'Distributed Intelligence' ? 'cyan' : (subtitle === 'Edge Orchestration' ? 'purple' : 'white')}-400`;
+                    gsap.to([titleEl, descEl], { opacity: 1, y: 0, duration: 0.3 });
+                }
+            });
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        function onMouseMove(event) {
+            mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+        }
+
+        // Start
+        init();
+        animate();
+    </script>
+
+<!-- AI³ Navigator Widget -->
+<div id="nav-widget" style="
+    position: fixed;
+    top: 70px;
+    left: 24px;
+    width: 120px;
+    height: 120px;
+    z-index: 9999;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 0 20px rgba(0,229,255,0.15);
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+" onmouseenter="this.style.transform='scale(1.08)';this.style.boxShadow='0 0 30px rgba(0,229,255,0.3)'" onmouseleave="this.style.transform='scale(1)';this.style.boxShadow='0 0 20px rgba(0,229,255,0.15)'">
+    <iframe src="../navigator-widget/index.html" 
+        style="width:600px;height:600px;border:none;transform:scale(0.2);transform-origin:top left;pointer-events:none;"
+    ></iframe>
+    <div onclick="window.location.href='../navigator-inner/index.html'" 
+        style="position:absolute;top:0;left:0;right:0;bottom:0;z-index:1;cursor:pointer;">
+    </div>
+</div>
+<!-- /AI3 Navigator Widget -->
+
+</body>
+</html>
