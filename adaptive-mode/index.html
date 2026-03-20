@@ -809,7 +809,7 @@ function renderAvatars() {
 function renderDock() {
     const bar = document.getElementById('dock-bar');
     bar.innerHTML = PANELS_CFG.map(p => `
-        <button class="dock-btn ${currentPanel===p.id?'active':''}" style="--panel-color:${p.color}; --ac:${p.color}" onclick="togglePanel('${p.id}')">
+        <button class="dock-btn ${currentPanel===p.id?'active':''}" style="--panel-color:${p.color}; --ac:${p.color}" onclick="${p.id==='notes' ? "window.location.href=\'../engine/index.html\'" : "togglePanel(\'"+p.id+"\')"}">
             ${p.notif && currentPanel !== p.id ? '<div class="dock-notif"></div>' : ''}
             <div class="dock-icon">${kimiMicro()}</div>
             <div class="dock-label">${p.label}</div>
@@ -1010,10 +1010,10 @@ initThree();
     box-shadow: 0 0 20px rgba(0,229,255,0.15);
     transition: transform 0.3s ease, box-shadow 0.3s ease;
 " onmouseenter="this.style.transform='scale(1.08)';this.style.boxShadow='0 0 30px rgba(0,229,255,0.3)'" onmouseleave="this.style.transform='scale(1)';this.style.boxShadow='0 0 20px rgba(0,229,255,0.15)'">
-    <iframe src="../navigator-widget/wb-navigator-widget.html" 
+    <iframe src="../navigator-widget/index.html"
         style="width:600px;height:600px;border:none;transform:scale(0.2);transform-origin:top left;pointer-events:none;"
     ></iframe>
-    <div onclick="window.location.href='../navigator-inner/wb-navigator-inner.html'" 
+    <div onclick="window.location.href='../navigator-inner/index.html'" 
         style="position:absolute;top:0;left:0;right:0;bottom:0;z-index:1;cursor:pointer;">
     </div>
 </div>
