@@ -354,9 +354,13 @@
             coreGlowMat.opacity = 0.15 + eased * 0.85;
 
             if (p >= 1.0 && portalTargetUrl) {
-                // If inside iframe — postMessage to parent for navigation
                 if (window !== window.top) {
-                    window.parent.postMessage({ type: 'portal-navigate', url: portalTargetUrl }, '*');
+                    // Inside iframe — try direct navigation first (same-origin), fallback to postMessage
+                    try {
+                        window.top.location.href = portalTargetUrl;
+                    } catch(err) {
+                        window.parent.postMessage({ type: 'portal-navigate', url: portalTargetUrl }, '*');
+                    }
                 } else {
                     window.location.href = portalTargetUrl;
                 }
@@ -455,15 +459,22 @@
     wrapper.addEventListener('click', (e) => {
         if (portalActive) return;
 
-        // Convert click to normalized device coordinates
-        const rect = canvas.getBoundingClientRect();
-        clickMouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
-        clickMouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+        // When scaled inside iframe, raycaster coords may be off — 
+        // since the widget is small (120px), treat any click as cube click
+        const isInIframe = window !== window.top;
+        
+        if (!isInIframe) {
+            // Full-size: use raycaster for precision
+            const rect = canvas.getBoundingClientRect();
+            clickMouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+            clickMouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
 
-        raycaster.setFromCamera(clickMouse, camera);
-        const hits = raycaster.intersectObject(cube);
+            raycaster.setFromCamera(clickMouse, camera);
+            const hits = raycaster.intersectObject(cube);
+            if (hits.length === 0) return;
+        }
 
-        if (hits.length > 0) {
+        {
             // Hit the cube — activate portal!
             portalActive = true;
             portalProgress = 0;
